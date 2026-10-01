@@ -1,18 +1,10 @@
 import { For, Show, createMemo, createSignal, useContext } from "solid-js";
 import { Search } from "lucide-static";
-import { canConnectTypes, resolvePorts, makeNode } from "../core/graph";
-import { allNodeDefs } from "../core/registry";
-import type { GraphKind, NodeDef, PortDef } from "../core/types";
+import type { NodeDef } from "../core/types";
 import { Icon, ThemedPortal } from "../ui";
+import { addableNodeDefs, compatiblePort, matchScore } from "./node-search";
 import { EditorContext, type Editor } from "./store";
 import { ui, type PickerState } from "./ui-state";
-
-function compatiblePort(def: NodeDef, from: { side: "in" | "out"; type: string }, doc: Parameters<typeof resolvePorts>[0]): PortDef | undefined {
-  const ports = resolvePorts(doc, makeNode(def.type, { x: 0, y: 0 }));
-  const list = from.side === "out" ? ports.inputs.filter((p) => !p.propertyOnly) : ports.outputs;
-  const ok = list.filter((p) => (from.side === "out" ? canConnectTypes(from.type, p.type) : canConnectTypes(p.type, from.type)));
-  return ok.find((p) => p.type === from.type) ?? ok.find((p) => p.key === "out") ?? ok[0];
-}
 
 export function NodePicker() {
   const ed = useContext(EditorContext);
@@ -27,32 +19,13 @@ function PickerPanel(props: { screen: { x: number; y: number }; pending?: Picker
   const ed = props.ed;
   const [q, setQ] = createSignal("");
   const [active, setActive] = createSignal(0);
-  const graphKind = (): GraphKind => (ed.state.graph === "post" ? "post" : "material");
   const results = createMemo(() => {
     const query = q().toLowerCase().trim();
-    const from = props.pending?.from;
-    let defs = allNodeDefs().filter(
-      (d) =>
-        d.category !== "Subgraph" &&
-        d.kind !== "placeholder" &&
-        d.category !== "Loop" &&
-        d.type !== "utils/group" &&
-        (!d.graphs || ed.state.graph.startsWith("sg:") || d.graphs.includes(graphKind())),
-    );
-    if (from) defs = defs.filter((d) => compatiblePort(d, from, ed.state.doc));
+    let defs = addableNodeDefs(ed, props.pending?.from);
     if (query) {
-      const score = (d: NodeDef) => {
-        const l = d.label.toLowerCase();
-        if (l === query) return 0;
-        if (l.startsWith(query)) return 1;
-        if (l.includes(query)) return 2;
-        if (d.type.toLowerCase().includes(query) || (d.tsl ?? "").toLowerCase().includes(query)) return 3;
-        if ((d.description ?? "").toLowerCase().includes(query)) return 4;
-        return 99;
-      };
       defs = defs
-        .map((d) => [d, score(d)] as const)
-        .filter(([, s]) => s < 99)
+        .map((d) => [d, matchScore(d, query, { description: true })] as const)
+        .filter((x): x is readonly [NodeDef, number] => x[1] !== null)
         .sort((a, b) => a[1] - b[1] || a[0].label.localeCompare(b[0].label))
         .map(([d]) => d);
     } else {

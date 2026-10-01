@@ -71,14 +71,16 @@ export function Button(
 
 export type Side = "top" | "bottom" | "left" | "right";
 
-function place(anchor: DOMRect, el: HTMLElement, side: Side, align: "start" | "center" | "end", gap = 6) {
+function place(anchor: DOMRect, el: HTMLElement, side: Side, align: "start" | "center" | "end", gap = 6, flip = true) {
   const r = el.getBoundingClientRect();
   let x = 0;
   let y = 0;
   // flip to the other side when this one doesn't fit but that one does
   const vh = window.innerHeight;
   const vw = window.innerWidth;
-  if (side === "bottom" && anchor.bottom + gap + r.height > vh - 6 && anchor.top - gap - r.height >= 6) side = "top";
+  if (!flip) {
+    // keep the requested side; the clamp below shifts it into view instead
+  } else if (side === "bottom" && anchor.bottom + gap + r.height > vh - 6 && anchor.top - gap - r.height >= 6) side = "top";
   else if (side === "top" && anchor.top - gap - r.height < 6 && anchor.bottom + gap + r.height <= vh - 6) side = "bottom";
   else if (side === "right" && anchor.right + gap + r.width > vw - 6 && anchor.left - gap - r.width >= 6) side = "left";
   else if (side === "left" && anchor.left - gap - r.width < 6 && anchor.right + gap + r.width <= vw - 6) side = "right";
@@ -168,10 +170,15 @@ export function Popover(
     trigger?: Element | null;
     side?: Side;
     align?: "start" | "center" | "end";
+    /** Flip to the opposite side when there's no room (default). false: stay put and shift into view instead. */
+    flip?: boolean;
+    /** Runs before Escape closes the popover; return true when the content handled it (e.g. to step back a level). */
+    onEscape?: () => boolean;
     class?: string;
   }>,
 ) {
   let el: HTMLDivElement | undefined;
+  let resize: ResizeObserver | undefined;
   createEffect(
     () => props.open,
     (open) => {
@@ -182,7 +189,13 @@ export function Popover(
         if (el && !el.contains(target)) props.onClose();
       };
       const onKey = (e: KeyboardEvent) => {
-        if (e.key === "Escape") props.onClose();
+        if (e.key !== "Escape") return;
+        if (props.onEscape?.()) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        props.onClose();
       };
       const t = setTimeout(() => window.addEventListener("pointerdown", onDown, true));
       window.addEventListener("keydown", onKey, true);
@@ -190,6 +203,7 @@ export function Popover(
         clearTimeout(t);
         window.removeEventListener("pointerdown", onDown, true);
         window.removeEventListener("keydown", onKey, true);
+        resize?.disconnect();
       };
     },
   );
@@ -199,9 +213,13 @@ export function Popover(
         <div
           ref={(e) => {
             el = e;
-            requestAnimationFrame(() => {
-              if (props.anchor) place(props.anchor, e, props.side ?? "bottom", props.align ?? "start");
-            });
+            // re-place when the content changes size (e.g. a menu that turns into a search list)
+            const reposition = () =>
+              props.anchor && place(props.anchor, e, props.side ?? "bottom", props.align ?? "start", 6, props.flip ?? true);
+            requestAnimationFrame(reposition);
+            resize?.disconnect();
+            resize = new ResizeObserver(() => reposition());
+            resize.observe(e);
           }}
           role="menu"
           class={[

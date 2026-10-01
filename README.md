@@ -6,20 +6,20 @@ tools. It is meant to be embedded in a parent application, which owns projects a
 
 ## What lives where
 
-| The package (tsl-graph)                                           | The parent application                                  |
-| ----------------------------------------------------------------- | ------------------------------------------------------- |
-| Graph editor UI, node registry, TSL compiler, live WebGPU preview | Project storage, listing, project browser, routing      |
-| Per-device settings (localStorage): AI provider/model/effort, preview FPS, subgraph library, clipboard, chat history | AI API keys                                             |
-| MCP endpoint, editor bridge, AI chat tool loop                    | Accounts / auth (gate the graph server with `authorize`) |
+| The package (tsl-graph)                                                                                              | The parent application                                   |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Graph editor UI, node registry, TSL compiler, live WebGPU preview                                                    | Project storage, listing, project browser, routing       |
+| Per-device settings (localStorage): AI provider/model/effort, preview FPS, subgraph library, clipboard, chat history | AI API keys                                              |
+| MCP endpoint, editor bridge, AI chat tool loop                                                                       | Accounts / auth (gate the graph server with `authorize`) |
 
 ## Entry points
 
-| Import                   | Runs in  | What                                                                          |
-| ------------------------ | -------- | ----------------------------------------------------------------------------- |
-| `tsl-graph`              | anywhere | Core: types, `GraphHost`/`ProjectStore` contracts, templates, compiler, importers |
-| `tsl-graph/editor`       | browser  | `<GraphEditor>` (Solid) and `mountGraphEditor(el, props)` (any framework)     |
-| `tsl-graph/server`       | Node     | `createGraphServer()` (MCP + bridge + AI chat), `createFileStore()`           |
-| `tsl-graph/styles.css`   | browser  | Editor styles (Tailwind v4 source; scoped to the editor root)                 |
+| Import                 | Runs in  | What                                                                              |
+| ---------------------- | -------- | --------------------------------------------------------------------------------- |
+| `tsl-graph`            | anywhere | Core: types, `GraphHost`/`ProjectStore` contracts, templates, compiler, importers |
+| `tsl-graph/editor`     | browser  | `<GraphEditor>` (Solid) and `mountGraphEditor(el, props)` (any framework)         |
+| `tsl-graph/server`     | Node     | `createGraphServer()` (MCP + bridge + AI chat), `createFileStore()`               |
+| `tsl-graph/styles.css` | browser  | Editor styles (Tailwind v4 source; scoped to the editor root)                     |
 
 ## Embedding
 
@@ -30,17 +30,17 @@ import { mountGraphEditor, type GraphHost } from "tsl-graph/editor";
 import "tsl-graph/styles.css";
 
 const host: GraphHost = {
-  projects: {
-    load: (id) => myApi.getProject(id),
-    save: (doc) => myApi.saveProject(doc),            // debounced autosave from the editor
-    create: (name, from) => myApi.createProject(name, from), // tutorials, "remix"
-  },
-  openProject: (id) => router.push(`/shaders/${id}`), // tutorials, remix, MCP open_project
-  exit: () => router.push("/shaders"),                // logo in the top bar (optional)
-  projectUrl: (id) => `${location.origin}/shaders/${id}`, // Share dialog (optional)
-  server: { url: "/tsl-graph" },                      // graph server; omit to run without MCP / AI chat
-  mcp: "graph",                                       // or "parent", see MCP below
-  ai: { getApiKey: (provider) => myKeys[provider] },  // optional, see "AI keys"
+    projects: {
+        load: (id) => myApi.getProject(id),
+        save: (doc) => myApi.saveProject(doc), // debounced autosave from the editor
+        create: (name, from) => myApi.createProject(name, from), // tutorials, "remix"
+    },
+    openProject: (id) => router.push(`/shaders/${id}`), // tutorials, remix, MCP open_project
+    exit: () => router.push("/shaders"), // logo in the top bar (optional)
+    projectUrl: (id) => `${location.origin}/shaders/${id}`, // Share dialog (optional)
+    server: { url: "/tsl-graph" }, // graph server; omit to run without MCP / AI chat
+    mcp: "graph", // or "parent", see MCP below
+    ai: { getApiKey: (provider) => myKeys[provider] }, // optional, see "AI keys"
 };
 
 const editor = mountGraphEditor(container, { host, projectId: "abc", theme: "dark" });
@@ -57,16 +57,16 @@ import { createServer } from "node:http";
 import { createGraphServer } from "tsl-graph/server";
 
 const graph = createGraphServer({
-  store,                        // ProjectStore: list / get / save / create — used by MCP when no editor tab is open
-  basePath: "/tsl-graph",       // same as GraphHost.server.url
-  projectUrl: (id) => `https://my.app/shaders/${id}`,
-  ai: { getApiKey: (provider, req) => keysFor(req, provider) },
-  authorize: (req) => isSignedIn(req), // optional, gates MCP, bridge and chat
+    store, // ProjectStore: list / get / save / create — used by MCP when no editor tab is open
+    basePath: "/tsl-graph", // same as GraphHost.server.url
+    projectUrl: (id) => `https://my.app/shaders/${id}`,
+    ai: { getApiKey: (provider, req) => keysFor(req, provider) },
+    authorize: (req) => isSignedIn(req), // optional, gates MCP, bridge and chat
 });
 
 const server = createServer(async (req, res) => {
-  if (await graph.handle(req, res)) return; // works with Express/Connect too
-  app(req, res);
+    if (await graph.handle(req, res)) return; // works with Express/Connect too
+    app(req, res);
 });
 graph.attach(server); // WebSocket bridge to open editor tabs
 ```
@@ -92,10 +92,10 @@ Keys never live in the package. Two ways to provide them; the first one that ret
 Who serves MCP to agents is set explicitly, with the same value on both sides: `createGraphServer({ mcp })` and
 `GraphHost.mcp`.
 
-| `mcp`               | Agents connect to                         | Editor UI                                                       |
-| ------------------- | ----------------------------------------- | --------------------------------------------------------------- |
-| `"graph"` (default) | the graph server's `<basePath>/mcp`       | "Connect agent (MCP)" menu item, dialog, Help tab, chat prompt |
-| `"parent"`          | the host's own MCP server (pass-through)  | none: the host decides how agents find its server               |
+| `mcp`               | Agents connect to                        | Editor UI                                                      |
+| ------------------- | ---------------------------------------- | -------------------------------------------------------------- |
+| `"graph"` (default) | the graph server's `<basePath>/mcp`      | "Connect agent (MCP)" menu item, dialog, Help tab, chat prompt |
+| `"parent"`          | the host's own MCP server (pass-through) | none: the host decides how agents find its server              |
 
 **Parent mode**, for apps whose MCP server covers several sections: register the graph tools on your server, optionally
 prefixed:
@@ -104,13 +104,13 @@ prefixed:
 const graph = createGraphServer({ store, mcp: "parent" });
 
 function createAppMcpServer() {
-  const mcp = new McpServer(
-    { name: "my-app", version: "1.0.0" },
-    { instructions: `…your app…\n\n## Shaders\n${graph.mcpInstructions("shader_")}` },
-  );
-  registerMyOtherSections(mcp);
-  graph.registerMcpTools(mcp, { prefix: "shader_" }); // shader_get_graph, shader_add_node, …
-  return mcp;
+    const mcp = new McpServer(
+        { name: "my-app", version: "1.0.0" },
+        { instructions: `…your app…\n\n## Shaders\n${graph.mcpInstructions("shader_")}` },
+    );
+    registerMyOtherSections(mcp);
+    graph.registerMcpTools(mcp, { prefix: "shader_" }); // shader_get_graph, shader_add_node, …
+    return mcp;
 }
 ```
 

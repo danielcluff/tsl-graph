@@ -35,6 +35,7 @@ import {
 } from "lucide-static";
 import { getNodeDef } from "../core/registry";
 import { Icon, MenuItem, MenuLabel, MenuSeparator, Popover, ThemedPortal, Tooltip, togglePopover, type PopoverAnchor } from "../ui";
+import { CanvasMenu } from "./CanvasMenu";
 import { HostContext, graphMcpUrl } from "./host";
 import { Logo } from "./Logo";
 import { EditorContext, PAN_MODE_ENABLED } from "./store";
@@ -351,6 +352,8 @@ function SubgraphBar() {
 // ---------------------------------------------------------------------------
 
 export function ContextMenu() {
+  /** Set while the canvas menu is open: steps back from its node list to the menu on Escape. */
+  let canvasEscape: (() => boolean) | undefined;
   const ed = useContext(EditorContext);
   const close = () => ui.closeMenus();
   const rect = () => {
@@ -365,30 +368,19 @@ export function ContextMenu() {
     close();
     fn();
   };
+  // the canvas menu grows into a search list: shift it into view rather than flipping it away from the cursor
   return (
-    <Popover open={!!ui.context()} anchor={rect()} onClose={close} class="w-56">
-      <Show when={ui.context()?.target.kind === "canvas"}>
-        <MenuItem onSelect={run(() => ui.openPicker(ui.context()!.screen))}>Add node…</MenuItem>
-        <MenuItem shortcut={SHORTCUTS.paste.display} onSelect={run(() => void ed.paste(ed.screenToFlow(ui.context()!.screen.x, ui.context()!.screen.y)))}>
-          Paste
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem icon={FileCode2} onSelect={run(() => ed.addNodeAt("code/tsl", ed.screenToFlow(ui.context()!.screen.x, ui.context()!.screen.y)))}>
-          Create Code Node
-        </MenuItem>
-        <MenuItem icon={Repeat} onSelect={run(() => ed.createLoop(ed.screenToFlow(ui.context()!.screen.x, ui.context()!.screen.y)))}>
-          Create Loop
-        </MenuItem>
-        <MenuItem onSelect={run(() => ed.addNodeAt("utils/comment", ed.screenToFlow(ui.context()!.screen.x, ui.context()!.screen.y)))}>
-          Add Comment
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem icon={Scan} onSelect={run(() => ed.fitView())}>
-          Fit View
-        </MenuItem>
-        <MenuItem icon={LayoutGrid} onSelect={run(() => ed.autoLayout())}>
-          Auto Layout
-        </MenuItem>
+    <Popover
+      open={!!ui.context()}
+      anchor={rect()}
+      onClose={close}
+      flip={ui.context()?.target.kind !== "canvas"}
+      onEscape={() => canvasEscape?.() ?? false}
+      class={ui.context()?.target.kind === "canvas" ? "w-64" : "w-56"}
+    >
+      {/* keyed on the context object: every right-click starts with an empty search */}
+      <Show when={ui.context()?.target.kind === "canvas" && ui.context()} keyed>
+        {(c) => <CanvasMenu screen={c.screen} bindEscape={(fn) => (canvasEscape = fn)} />}
       </Show>
       <Show when={node()}>
         {(n) => (
