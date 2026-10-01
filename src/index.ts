@@ -2,7 +2,9 @@
 // templates and importers. Safe to use in Node and the browser.
 export * from "./core/types";
 export { PROVIDER_IDS, type GraphHost, type McpMode, type ProjectSource, type ProjectStore, type ProviderId } from "./host";
-export { createProject, normalizeDoc, nodeCount } from "./core/graph";
+/// <reference path="./types.d.ts" />
+export { createProject, makeNode, normalizeDoc, nodeCount, resolvePorts } from "./core/graph";
+export { CATEGORY_ORDER, allNodeDefs, getNodeDef } from "./core/registry";
 export { compileProject } from "./core/codegen";
 export { executeCommand, isReadOnly, listNodeTypes, describeNodeType, type Command } from "./core/commands";
 export { TEMPLATES, projectFromTemplate } from "./core/templates";

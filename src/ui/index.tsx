@@ -720,3 +720,6 @@ export function ThemedPortal(props: { children: JSX.Element }) {
     </Portal>
   );
 }
+
+/** The editor theme (also applied to every portal); hosts sharing the UI kit keep it in sync with their own. */
+export { setTheme, theme, type Theme } from "./theme";

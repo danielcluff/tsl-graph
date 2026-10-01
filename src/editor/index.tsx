@@ -1,9 +1,12 @@
 // Browser entry: the graph editor as a Solid component, or mounted into any
 // DOM element for hosts that don't use Solid.
+/// <reference path="../types.d.ts" />
 import { render } from "@solidjs/web";
 import { GraphEditor, type GraphEditorProps } from "./GraphEditor";
 
 export { GraphEditor, type GraphEditorProps } from "./GraphEditor";
+/** Static node rendering (e.g. for a node reference page): pass `static` and a document. */
+export { NodeCard } from "./NodeCard";
 export type { GraphHost, McpMode, ProjectSource, ProviderId } from "../host";
 export type { Theme } from "../ui/theme";
 

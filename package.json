@@ -7,8 +7,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./editor": "./src/editor/index.tsx",
+    "./ui": "./src/ui/index.tsx",
     "./server": "./src/server/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./editor.css": "./src/editor.css"
   },
   "bin": {
     "tsl-graph-mcp": "./scripts/mcp-stdio.mjs"

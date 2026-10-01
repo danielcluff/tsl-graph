@@ -27,6 +27,8 @@ export interface GraphEditorProps {
   theme?: Theme;
   /** Hide the export/share controls in the top bar (for embedded views). */
   embed?: boolean;
+  /** A message to show (as a toast) once the project has loaded, e.g. an import summary. */
+  notice?: { message: string; kind?: "info" | "error" | "success" };
 }
 
 /**
@@ -65,14 +67,16 @@ export function GraphEditor(props: GraphEditorProps) {
             </div>
           }
         >
-          {(d) => <EditorShell doc={d} persist={!untrack(() => props.doc)} embed={!!untrack(() => props.embed)} />}
+          {(d) => (
+            <EditorShell doc={d} persist={!untrack(() => props.doc)} embed={!!untrack(() => props.embed)} notice={untrack(() => props.notice)} />
+          )}
         </Show>
       </div>
     </HostContext>
   );
 }
 
-function EditorShell(props: { doc: ProjectDoc; persist: boolean; embed: boolean }) {
+function EditorShell(props: { doc: ProjectDoc; persist: boolean; embed: boolean; notice?: GraphEditorProps["notice"] }) {
   const host = useContext(HostContext);
   const ed = createEditor(untrack(() => props.doc), { save: untrack(() => props.persist) ? (doc) => host.projects.save(doc) : undefined });
   const chat = createChat(ed, host);
@@ -84,6 +88,8 @@ function EditorShell(props: { doc: ProjectDoc; persist: boolean; embed: boolean 
 
   onSettled(() => {
     ed.compileNow();
+    const notice = untrack(() => props.notice);
+    if (notice) setTimeout(() => ui.toast(notice.message, notice.kind ?? "info"), 600);
     const offKeys = installShortcuts(ed, () =>
       chat.setState((d) => {
         d.open = !(d.open && !d.minimized);

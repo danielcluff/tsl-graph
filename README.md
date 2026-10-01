@@ -17,9 +17,11 @@ tools. It is meant to be embedded in a parent application, which owns projects a
 | Import                 | Runs in  | What                                                                              |
 | ---------------------- | -------- | --------------------------------------------------------------------------------- |
 | `tsl-graph`            | anywhere | Core: types, `GraphHost`/`ProjectStore` contracts, templates, compiler, importers |
-| `tsl-graph/editor`     | browser  | `<GraphEditor>` (Solid) and `mountGraphEditor(el, props)` (any framework)         |
-| `tsl-graph/server`     | Node     | `createGraphServer()` (MCP + bridge + AI chat), `createFileStore()`               |
-| `tsl-graph/styles.css` | browser  | Editor styles (Tailwind v4 source; scoped to the editor root)                     |
+| `tsl-graph/editor`     | browser  | `<GraphEditor>` (Solid), `mountGraphEditor(el, props)` (any framework), `NodeCard` |
+| `tsl-graph/ui`         | browser  | The UI kit the editor uses (Button, Dialog, Popover, …) and `setTheme`             |
+| `tsl-graph/server`     | Node     | `createGraphServer()` (MCP + bridge + AI chat), `createFileStore()`                |
+| `tsl-graph/styles.css` | browser  | Complete editor styles, Tailwind included                                          |
+| `tsl-graph/editor.css` | browser  | Editor styles for hosts with their own Tailwind v4 build (see Styles)              |
 
 ## Embedding
 
@@ -137,6 +139,21 @@ pnpm typecheck
 Test the chat loop without keys: `PORT=5199 npx tsx scripts/mock-ai.ts`, then start the playground with
 `ANTHROPIC_BASE_URL=http://127.0.0.1:5199 OPENAI_BASE_URL=http://127.0.0.1:5199/v1 GEMINI_BASE_URL=http://127.0.0.1:5199`
 and enter any key on the playground page. `scripts/mcp-smoke.ts` drives a full agent session over MCP.
+
+### Styles
+
+Hosts without their own Tailwind build import `tsl-graph/styles.css`. Hosts that have one import the editor's part into
+it, and add the editor's dark class to the `dark` variant:
+
+```css
+@import "tailwindcss";
+@import "tsl-graph/editor.css";
+@custom-variant dark (&:where(.dark, .dark *, .tsl-dark, .tsl-dark *));
+```
+
+The editor's tokens and base styles are scoped to `.tsl-graph-root`, so they don't touch the host page. If the host
+uses `tsl-graph/ui` for its own pages, call `setTheme("dark" | "light")` so its dialogs and menus follow the site theme.
+`GraphEditor` also takes a `theme` prop and a one-off `notice` (a toast once the project loads).
 
 ## Notes for consumers
 
