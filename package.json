@@ -1,0 +1,64 @@
+{
+  "name": "tsl-graph",
+  "version": "0.1.0",
+  "description": "Node-graph editor for Three.js TSL shaders, with an MCP server and AI chat, embeddable in a host app.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "exports": {
+    ".": "./src/index.ts",
+    "./editor": "./src/editor/index.tsx",
+    "./server": "./src/server/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "bin": {
+    "tsl-graph-mcp": "./scripts/mcp-stdio.mjs"
+  },
+  "files": [
+    "src",
+    "scripts/mcp-stdio.mjs"
+  ],
+  "scripts": {
+    "dev": "tsx playground/server.ts",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.43.13",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@google/genai": "^2.24.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "codemirror": "^6.0.2",
+    "lucide-static": "^1.48.0",
+    "openai": "^7.23.0",
+    "tsl-easings": "^0.0.1",
+    "tsl-textures": "^3.0.5",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "@solidjs/web": "2.0.0-rc.11",
+    "solid-js": "2.0.0-rc.11",
+    "three": ">=0.186.0"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.35",
+    "@solidjs/web": "2.0.0-rc.11",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.3",
+    "@types/three": "^0.186.0",
+    "@types/ws": "^8.18.1",
+    "solid-js": "2.0.0-rc.11",
+    "tailwindcss": "^4.3.3",
+    "three": "^0.186.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}
