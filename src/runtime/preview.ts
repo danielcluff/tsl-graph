@@ -86,7 +86,7 @@ export class PreviewRenderer {
   private envToken = 0;
   private resizeObserver: ResizeObserver;
   private debugTargets = new Map<string, DebugTarget>();
-  private debugMesh = new THREE.QuadMesh(new THREE.MeshBasicNodeMaterial());
+  private debugMesh = PreviewRenderer.debugQuad();
   // one float target per previewed node (so they can all be read back at once), float so
   // previews can report the real output values, not 8-bit colours
   private debugRTs = new Map<string, THREE.RenderTarget>();
@@ -565,6 +565,22 @@ export class PreviewRenderer {
     if (!cached || cached.type !== t) return false;
     const sig = this.nodeSignatures?.get(id);
     return sig !== undefined && cached.sig !== undefined ? cached.sig === sig : cached.node === node;
+  }
+
+  /**
+   * Fullscreen quad for node thumbnails. three's QuadMesh geometry only has
+   * position and uv, so nodes that read normals or tangents (normalLocal,
+   * Fresnel, …) would warn "Vertex attribute not found"; this copy adds a
+   * flat facing normal and tangent. (The shared quad geometry is left alone.)
+   */
+  private static debugQuad() {
+    const quad = new THREE.QuadMesh(new THREE.MeshBasicNodeMaterial());
+    const geo = quad.geometry.clone();
+    const n = geo.getAttribute("position").count;
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(Array.from({ length: n }, () => [0, 0, 1]).flat(), 3));
+    geo.setAttribute("tangent", new THREE.Float32BufferAttribute(Array.from({ length: n }, () => [1, 0, 0, 1]).flat(), 4));
+    quad.geometry = geo;
+    return quad;
   }
 
   private debugMaterial(id: string, node: THREE.Node, t: string) {

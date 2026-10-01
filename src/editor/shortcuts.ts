@@ -89,6 +89,17 @@ function typing(e: KeyboardEvent): boolean {
   );
 }
 
+/**
+ * Text selected inside a `[data-allow-copy]` element (e.g. preview error
+ * messages): the copy shortcut copies that text instead of the selected nodes.
+ */
+function copyableTextSelected(): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return false;
+  const at = sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement;
+  return !!at?.closest("[data-allow-copy]");
+}
+
 export function installShortcuts(ed: Editor, toggleChat: () => void = () => {}): () => void {
   const onKey = (e: KeyboardEvent) => {
     if (e.defaultPrevented || typing(e)) return;
@@ -106,7 +117,7 @@ export function installShortcuts(ed: Editor, toggleChat: () => void = () => {}):
     if (matches(S.viewCode, e)) return act(() => ui.openDialog("code"));
     if (matches(S.codeNode, e)) return act(() => ed.addNodeAt("code/tsl", ed.screenToFlow(ed.pointer().x, ed.pointer().y)));
     if (matches(S.subgraph, e)) return act(() => !ed.state.subgraph && ed.createSubgraph());
-    if (matches(S.copy, e)) return act(ed.copySelection);
+    if (matches(S.copy, e)) return copyableTextSelected() ? undefined : act(ed.copySelection);
     if (matches(S.paste, e)) return act(() => void ed.paste());
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === "KeyD") return act(ed.duplicateSelection);
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.code === "KeyA")

@@ -322,22 +322,34 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
               <Show
                 when={e.nodeId}
                 fallback={
-                  <div class="flex items-start gap-1.5 rounded-md bg-red-500/85 px-2.5 py-1.5 shadow">
+                  <div data-allow-copy class="flex items-start gap-1.5 rounded-md bg-red-500/85 px-2.5 py-1.5 shadow">
                     <Icon svg={CircleAlert} class="mt-px size-3 shrink-0" />
-                    <span class="min-w-0 break-words">{e.message}</span>
+                    <span class="min-w-0 cursor-text break-words select-text">{e.message}</span>
                   </div>
                 }
               >
-                <button
-                  type="button"
-                  class="group flex w-full cursor-pointer items-start gap-1.5 rounded-md bg-red-500/85 px-2.5 py-1.5 text-left shadow hover:bg-red-500"
+                {/* a div rather than a button so the message can be selected and copied */}
+                <div
+                  role="button"
+                  tabindex="0"
+                  data-allow-copy
+                  class="group flex w-full cursor-pointer items-start gap-1.5 rounded-md bg-red-500/85 px-2.5 py-1.5 text-left shadow outline-none hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-white/60"
                   title="Show node"
-                  onClick={() => focusError(e)}
+                  onClick={() => {
+                    // finishing a text selection is not a click on the error
+                    if (!window.getSelection()?.isCollapsed) return;
+                    focusError(e);
+                  }}
+                  onKeyDown={(ev) => {
+                    if (ev.key !== "Enter" && ev.key !== " ") return;
+                    ev.preventDefault();
+                    focusError(e);
+                  }}
                 >
                   <Icon svg={CircleAlert} class="mt-px size-3 shrink-0" />
-                  <span class="min-w-0 flex-1 break-words">{e.message}</span>
+                  <span class="min-w-0 flex-1 break-words select-text">{e.message}</span>
                   <Icon svg={Crosshair} class="mt-px size-3 shrink-0 opacity-60 group-hover:opacity-100" />
-                </button>
+                </div>
               </Show>
             )}
           </For>
