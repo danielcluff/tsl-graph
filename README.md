@@ -129,12 +129,22 @@ clients in graph mode: `TSL_GRAPH_URL=<mcp url> npx tsl-graph-mcp`.
 `playground/` is a minimal host app (hash routes, JSON-file store, REST API, AI keys from env or typed into the page, and
 its own MCP server that passes the graph tools through as `shader_*`).
 
+The canvas is [solid-graph](https://github.com/danielcluff/solid-graph), a git submodule in `packages/solid-graph`
+(a pnpm workspace package): clone with `--recurse-submodules`, or run `git submodule update --init` in a checkout.
+
 ```bash
 pnpm install
 pnpm dev            # http://localhost:5173, the app's MCP at http://localhost:5173/mcp (graph tools as shader_*)
 pnpm test
+pnpm test:e2e       # canvas behaviour in headless Chromium (npx playwright-core install chromium once)
 pnpm typecheck
 ```
+
+`pnpm bench` measures the canvas (pan, zoom, drags, box select, wires, selection, add/remove) on generated projects of
+70, 200 and 500 nodes against a running playground (`--url`, default http://localhost:5173), saving the results to
+`bench/results/`; `--cpu 4` throttles the CPU, `pnpm bench --compare a.json b.json` compares two runs. The page it
+drives is `playground/bench.html?n=200`; `npx tsx scripts/bench-profile.ts --scenarios dragAll` (or `--mount`) lists
+the functions with the most self time.
 
 Test the chat loop without keys: `PORT=5199 npx tsx scripts/mock-ai.ts`, then start the playground with
 `ANTHROPIC_BASE_URL=http://127.0.0.1:5199 OPENAI_BASE_URL=http://127.0.0.1:5199/v1 GEMINI_BASE_URL=http://127.0.0.1:5199`
@@ -159,7 +169,8 @@ uses `tsl-graph/ui` for its own pages, call `setTheme("dark" | "light")` so its 
 
 - The package ships TypeScript/TSX source. The host bundler needs Solid's JSX transform (`@solidjs/vite-plugin`) and
   Tailwind v4 (`@tailwindcss/vite`) to process `styles.css`; the Node side needs a TS runtime (tsx) or a build step.
-- `solid-js`, `@solidjs/web` and `three` are peer dependencies.
+- `solid-js`, `@solidjs/web` and `three` are peer dependencies. The canvas comes from `solid-graph` (TSX source too);
+  `tsl-graph/editor.css` imports its stylesheet.
 - Keyboard shortcuts listen on `window` while the editor is mounted.
 
 ## Layout
@@ -171,5 +182,7 @@ src/editor/    Solid editor UI (GraphEditor, panels, AI chat client, bridge clie
 src/ui/        UI kit + theme
 src/server/    graph server: MCP, bridge, tool table (tools.ts, shared by MCP and chat), ai/ provider adapters
 src/host.ts    the host contracts (GraphHost, ProjectStore)
-playground/    example host app
+playground/    example host app (also bench.html, e2e.html: the benchmark and canvas-test pages)
+packages/      solid-graph (submodule): the canvas
+tests/e2e/     canvas tests in headless Chromium
 ```

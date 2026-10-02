@@ -8,6 +8,7 @@
    and its portals); the dark theme is .tsl-dark on the same element. */
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
+@import "solid-graph/styles.css";
 
 @source "./";
 
@@ -142,40 +143,19 @@
 .tsl-dark .cat-default { background: color-mix(in oklab, var(--color-gray-900) 20%, transparent); }
 
 /* ---- canvas --------------------------------------------------------------- */
+/* the canvas is solid-graph's: theme it with the editor's tokens */
 .graph-canvas {
-  background-color: var(--background);
-  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
+  --sg-bg: var(--background);
+  --sg-grid: var(--canvas-dot);
+  --sg-selection: #3b82f6;
 }
 .graph-handle {
   background-color: var(--handle-bg);
   transition: background-color 150ms;
 }
 .graph-handle:hover,
-.graph-handle.is-connecting-target {
+.graph-handle[data-connect-target] {
   background-color: var(--handle-hover-bg);
-}
-.edge-path {
-  fill: none;
-  stroke-width: 2;
-}
-.edge-hit {
-  fill: none;
-  stroke: transparent;
-  stroke-width: 14;
-  pointer-events: stroke;
-  cursor: pointer;
-}
-.edge-selected {
-  filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.9));
-}
-@keyframes edge-dash {
-  to {
-    stroke-dashoffset: -20;
-  }
-}
-.edge-animated {
-  stroke-dasharray: 6 4;
-  animation: edge-dash 0.6s linear infinite;
 }
 
 /* scrollbars */

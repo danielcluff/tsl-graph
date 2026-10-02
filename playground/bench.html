@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TSL Graph Canvas Bench</title>
+    <style>
+      #status { position: fixed; top: 4px; right: 8px; z-index: 9999; pointer-events: none; font: 12px monospace; color: #9ca3af; }
+      #results { position: fixed; inset: 40px 40px auto auto; z-index: 9999; max-height: 80vh; overflow: auto; margin: 0; padding: 12px; background: #111827ee; color: #e5e7eb; font: 11px monospace; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" style="position: fixed; inset: 0"></div>
+    <div id="status"></div>
+    <pre id="results" hidden></pre>
+    <script type="module" src="./bench/bench.tsx"></script>
+  </body>
+</html>

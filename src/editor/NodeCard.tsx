@@ -8,6 +8,7 @@ import type { DebugStats } from "../runtime/preview";
 import { PREVIEW_SIZE } from "../runtime/preview-size";
 import { fmtValue } from "./format";
 import { Icon, Popover, type PopoverAnchor } from "../ui";
+import { Handle as GraphHandle } from "solid-graph";
 
 export interface NodeCardProps {
   doc: ProjectDoc;
@@ -21,9 +22,8 @@ export interface NodeCardProps {
   outTypes?: Record<string, string>;
   connectedIn?: Set<string>;
   connectedOut?: Set<string>;
-  /** handle currently hovered as a valid connection target */
-  targetHandle?: string | null;
-  onHandleDown?: (e: PointerEvent, side: "in" | "out", key: string) => void;
+  /** Rendered as a node of the canvas (solid-graph): ports are handles that connect. */
+  interactive?: boolean;
   /** Node can show a live preview thumbnail (it has a value in the material graph). */
   previewable?: boolean;
   /** The output is the same everywhere on the surface (from the graph), so a picture adds nothing. */
@@ -183,8 +183,7 @@ export function NodeCard(props: NodeCardProps) {
                         portKey={p().key}
                         type={props.outTypes?.[p().key] ?? p().type}
                         connected={!!props.connectedOut?.has(p().key)}
-                        active={false}
-                        onDown={props.onHandleDown}
+                        interactive={props.interactive}
                       />
                       <span
                         class={[
@@ -223,8 +222,7 @@ function InputPort(props: { card: NodeCardProps; port: PortDef; wrap?: boolean }
                         portKey={props.port.key}
                         type={props.card.inTypes?.[props.port.key] ?? props.port.type}
                         connected={!!props.card.connectedIn?.has(props.port.key)}
-                        active={props.card.targetHandle === `in:${props.port.key}`}
-                        onDown={props.card.onHandleDown}
+                        interactive={props.card.interactive}
                       />
                       <span
                         class={[
@@ -277,32 +275,25 @@ function Handle(props: {
   portKey: string;
   type: string;
   connected: boolean;
-  active: boolean;
-  onDown?: (e: PointerEvent, side: "in" | "out", key: string) => void;
+  interactive?: boolean;
 }) {
   const color = () => typeColor(props.type);
+  const cls = () => ["graph-handle relative h-4 w-2", props.side === "in" ? "rounded-r-[3px]" : "rounded-l-[3px]"];
+  const style = () => ({
+    "--handle-bg": props.connected ? color() : "var(--handle-idle, rgba(255,255,255,0.1))",
+    "--handle-hover-bg": color(),
+  });
   return (
     <div class="relative flex items-center" title={props.type}>
-      <div
-        data-handle={`${props.side}:${props.portKey}`}
-        data-node={props.nodeId}
-        data-type={props.type}
-        class={[
-          "graph-handle relative h-4 w-2",
-          props.side === "in" ? "rounded-r-[3px]" : "rounded-l-[3px]",
-          { "is-connecting-target": props.active },
-          props.onDown ? "cursor-crosshair" : "",
-        ]}
-        style={{
-          "--handle-bg": props.connected ? color() : "var(--handle-idle, rgba(255,255,255,0.1))",
-          "--handle-hover-bg": color(),
-        }}
-        onPointerDown={(e) => {
-          if (!props.onDown) return;
-          e.stopPropagation();
-          props.onDown(e, props.side, props.portKey);
-        }}
-      />
+      <Show when={props.interactive} fallback={<div data-handle={`${props.side}:${props.portKey}`} class={cls()} style={style()} />}>
+        <GraphHandle
+          type={props.side === "in" ? "target" : "source"}
+          id={props.portKey}
+          position={props.side === "in" ? "left" : "right"}
+          class={[...cls(), "cursor-crosshair"].join(" ")}
+          style={style()}
+        />
+      </Show>
     </div>
   );
 }
@@ -486,8 +477,7 @@ function MultiOpBody(props: NodeCardProps) {
             portKey="out"
             type={props.outTypes?.out ?? "any"}
             connected={!!props.connectedOut?.has("out")}
-            active={false}
-            onDown={props.onHandleDown}
+            interactive={props.interactive}
           />
           <span
             class={[
