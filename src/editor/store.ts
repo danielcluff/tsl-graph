@@ -1,4 +1,5 @@
 import { createContext, createMemo, createSignal, flush, reconcile, snapshot, createStore } from "solid-js";
+import type { GraphApi } from "solid-graph";
 import { compileProject, type CompileResult } from "../core/codegen";
 import { executeCommand, type Command } from "../core/commands";
 import { chainToMultiOp, detectConvertibleChain, multiOpToChain } from "../core/multiop";
@@ -51,12 +52,6 @@ export interface Viewport {
   y: number;
   zoom: number;
 }
-export interface NodeLayout {
-  w: number;
-  h: number;
-  /** handle offsets relative to node origin, keyed `in:key` / `out:key` */
-  handles: Record<string, XY>;
-}
 
 interface HistoryEntry {
   graphs: ProjectDoc["graphs"];
@@ -105,13 +100,14 @@ export function createEditor(
     canUndo: false,
     canRedo: false,
   });
-  const [layout, setLayout] = createStore<Record<string, NodeLayout>>({});
   const [compiled, setCompiled] = createSignal<CompileResult | null>(null, { equals: false });
   const [version, setVersion] = createSignal(0);
 
   let past: string[] = [];
   let future: string[] = [];
   let canvasEl: HTMLDivElement | undefined;
+  /** The canvas (solid-graph), once mounted: measured node sizes. */
+  let graphApi: GraphApi | undefined;
   let pointer: XY = { x: 0, y: 0 };
 
   // ---- derived -------------------------------------------------------------
@@ -339,8 +335,30 @@ export function createEditor(
   }
 
   function nodeSize(n: GraphNode) {
-    const l = layout[n.id];
-    return l ? { w: l.w, h: l.h } : estimateSize(n);
+    const s = graphApi?.nodeSize(n.id);
+    return s?.width ? { w: s.width, h: s.height } : estimateSize(n);
+  }
+
+  /**
+   * Handle anchors of a rendered node, relative to its origin in flow units, keyed `in:key` /
+   * `out:key` (inputs on their left edge, outputs on their right). Empty when it isn't rendered.
+   */
+  function handleOffsets(id: string): Record<string, XY> {
+    const el = canvasEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`);
+    if (!el) return {};
+    const zoom = viewport().zoom;
+    const base = el.getBoundingClientRect();
+    const out: Record<string, XY> = {};
+    for (const h of el.querySelectorAll<HTMLElement>("[data-handle-node]")) {
+      if (h.dataset.handleNode !== id) continue;
+      const r = h.getBoundingClientRect();
+      const input = h.dataset.handleType === "target";
+      out[`${input ? "in" : "out"}:${h.dataset.handleId}`] = {
+        x: ((input ? r.left : r.right) - base.left) / zoom,
+        y: (r.top + r.height / 2 - base.top) / zoom,
+      };
+    }
+    return out;
   }
 
   function fitView(ids?: string[], padding = 80, maxZoom = 1.5) {
@@ -404,54 +422,24 @@ export function createEditor(
     clearSelection();
   }
 
-  function moveNodes(delta: XY, ids: string[]) {
-    // children of moved containers move along
-    const all = new Set(ids);
-    for (const n of graph().nodes) if (n.parentId && all.has(n.parentId)) all.add(n.id);
+  /**
+   * A drag on the canvas: "start" records history, "move" places the nodes, "end" snaps them
+   * and applies container membership (`parentId`: null leaves, undefined keeps).
+   */
+  function dragNodes(moves: { id: string; position: XY; parentId?: string | null }[], phase: "start" | "move" | "end") {
+    if (phase === "start") return pushHistory();
+    const byId = new Map(moves.map((m) => [m.id, m]));
     mutate(
       (doc) => {
         for (const n of graphOf(doc, state.graph).nodes) {
-          if (all.has(n.id)) n.position = { x: n.position.x + delta.x, y: n.position.y + delta.y };
+          const m = byId.get(n.id);
+          if (!m) continue;
+          n.position = phase === "end" ? { x: Math.round(m.position.x), y: Math.round(m.position.y) } : m.position;
+          if (m.parentId !== undefined) n.parentId = m.parentId ?? undefined;
         }
       },
-      { history: false, recompile: false },
-    );
-  }
-
-  /** After a drag: snap positions and adopt/release container membership. */
-  function finishDrag(ids: string[]) {
-    mutate(
-      (doc) => {
-        const g = graphOf(doc, state.graph);
-        const containers = g.nodes.filter((n) => {
-          const k = getNodeDef(n.type)?.kind;
-          return k === "group" || k === "loop";
-        });
-        for (const n of g.nodes) {
-          if (!ids.includes(n.id)) continue;
-          n.position = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
-          const kind = getNodeDef(n.type)?.kind;
-          if (kind === "group" || kind === "loop" || kind === "comment") continue;
-          const s = nodeSize(n);
-          const cx = n.position.x + s.w / 2;
-          const cy = n.position.y + s.h / 2;
-          const hit = containers.find(
-            (c) =>
-              c.id !== n.id &&
-              cx > c.position.x &&
-              cx < c.position.x + (c.width ?? 400) &&
-              cy > c.position.y &&
-              cy < c.position.y + (c.height ?? 240),
-          );
-          const isLoopPart = n.type.startsWith("loop/");
-          if (hit) {
-            if (isLoopPart && getNodeDef(hit.type)?.kind !== "loop") continue;
-            n.parentId = hit.id;
-          } else if (n.parentId && !isLoopPart) n.parentId = undefined;
-          else if (n.parentId && isLoopPart) n.parentId = undefined;
-        }
-      },
-      { history: false },
+      // membership changes what loops compile, so the drop recompiles
+      { history: false, recompile: phase === "end" },
     );
   }
 
@@ -942,8 +930,6 @@ export function createEditor(
   return {
     state,
     setState,
-    layout,
-    setLayout,
     compiled,
     diagnostics,
     version,
@@ -956,6 +942,7 @@ export function createEditor(
     previewHooks,
     // setup
     setCanvas: (el: HTMLDivElement) => (canvasEl = el),
+    setGraphApi: (api: GraphApi | undefined) => (graphApi = api),
     canvas: () => canvasEl,
     setPointer: (p: XY) => (pointer = p),
     pointer: () => pointer,
@@ -981,13 +968,13 @@ export function createEditor(
     surfaceUniform,
     animated,
     nodeSize,
+    handleOffsets,
     setGraph,
     // actions
     addNodeAt,
     connect,
     deleteSelection,
-    moveNodes,
-    finishDrag,
+    dragNodes,
     setValue,
     updateData,
     toggleNodePreview,

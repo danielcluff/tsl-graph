@@ -23,7 +23,9 @@
     "dev": "tsx playground/server.ts",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "vitest run -c vitest.e2e.config.ts",
+    "bench": "tsx scripts/bench.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
@@ -38,6 +40,7 @@
     "codemirror": "^6.0.2",
     "lucide-static": "^1.48.0",
     "openai": "^7.23.0",
+    "solid-graph": "workspace:*",
     "tsl-easings": "^0.0.1",
     "tsl-textures": "^3.0.5",
     "ws": "^8.22.0",
@@ -55,6 +58,7 @@
     "@types/node": "^26.6.3",
     "@types/three": "^0.186.0",
     "@types/ws": "^8.18.1",
+    "playwright-core": "^1.63.0",
     "solid-js": "2.0.0-rc.11",
     "tailwindcss": "^4.3.3",
     "three": "^0.186.1",

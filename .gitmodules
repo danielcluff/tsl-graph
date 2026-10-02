@@ -1,0 +1,3 @@
+[submodule "packages/solid-graph"]
+	path = packages/solid-graph
+	url = https://github.com/danielcluff/solid-graph.git

@@ -1,0 +1,985 @@
+{
+  "label": "solid-graph-cpu4",
+  "cpu": 4,
+  "previews": false,
+  "reports": [
+    {
+      "impl": "solid-graph",
+      "nodes": 70,
+      "edges": 83,
+      "previews": false,
+      "steps": 60,
+      "canvas": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "mountMs": 329,
+      "heapMB": 72.2,
+      "domNodes": 3753,
+      "results": {
+        "idle": {
+          "steps": 60,
+          "median": 0,
+          "p95": 0.4,
+          "max": 0.8,
+          "mean": 0.1,
+          "longFrames": 0
+        },
+        "pan": {
+          "steps": 60,
+          "median": 2,
+          "p95": 2.4,
+          "max": 2.5,
+          "mean": 1.89,
+          "longFrames": 0
+        },
+        "zoom": {
+          "steps": 60,
+          "median": 1.6,
+          "p95": 2.1,
+          "max": 2.3,
+          "mean": 1.61,
+          "longFrames": 0
+        },
+        "dragNode": {
+          "steps": 62,
+          "median": 2.3,
+          "p95": 3.6,
+          "max": 7.9,
+          "mean": 2.42,
+          "longFrames": 0
+        },
+        "dragAll": {
+          "steps": 62,
+          "median": 9.5,
+          "p95": 10.8,
+          "max": 22.4,
+          "mean": 9.46,
+          "longFrames": 0
+        },
+        "boxSelect": {
+          "steps": 62,
+          "median": 3.1,
+          "p95": 6.2,
+          "max": 8.1,
+          "mean": 3.55,
+          "longFrames": 0
+        },
+        "connect": {
+          "steps": 62,
+          "median": 3,
+          "p95": 4.5,
+          "max": 13.6,
+          "mean": 3.25,
+          "longFrames": 0
+        },
+        "select": {
+          "steps": 60,
+          "median": 5.6,
+          "p95": 6.9,
+          "max": 7.4,
+          "mean": 5.67,
+          "longFrames": 0
+        },
+        "addRemove": {
+          "steps": 60,
+          "median": 15.7,
+          "p95": 17.5,
+          "max": 19.4,
+          "mean": 14.46,
+          "longFrames": 0
+        }
+      },
+      "reps": {
+        "idle": [
+          {
+            "steps": 60,
+            "median": 0.1,
+            "p95": 0.7,
+            "max": 0.8,
+            "mean": 0.21,
+            "longFrames": 2
+          },
+          {
+            "steps": 60,
+            "median": 0,
+            "p95": 0.5,
+            "max": 0.5,
+            "mean": 0.07,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 0,
+            "p95": 0.4,
+            "max": 0.8,
+            "mean": 0.1,
+            "longFrames": 0
+          }
+        ],
+        "pan": [
+          {
+            "steps": 60,
+            "median": 2.2,
+            "p95": 2.7,
+            "max": 3.5,
+            "mean": 2.11,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 2,
+            "p95": 2.5,
+            "max": 2.9,
+            "mean": 2,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 2,
+            "p95": 2.4,
+            "max": 2.5,
+            "mean": 1.89,
+            "longFrames": 0
+          }
+        ],
+        "zoom": [
+          {
+            "steps": 60,
+            "median": 1.7,
+            "p95": 2.4,
+            "max": 2.5,
+            "mean": 1.76,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 1.6,
+            "p95": 2,
+            "max": 2.3,
+            "mean": 1.59,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 1.6,
+            "p95": 2.1,
+            "max": 2.3,
+            "mean": 1.61,
+            "longFrames": 0
+          }
+        ],
+        "dragNode": [
+          {
+            "steps": 62,
+            "median": 2.6,
+            "p95": 3.8,
+            "max": 17.5,
+            "mean": 2.93,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 2.1,
+            "p95": 3.6,
+            "max": 7.2,
+            "mean": 2.44,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 2.3,
+            "p95": 3.6,
+            "max": 7.9,
+            "mean": 2.42,
+            "longFrames": 0
+          }
+        ],
+        "dragAll": [
+          {
+            "steps": 62,
+            "median": 9.6,
+            "p95": 11,
+            "max": 13.8,
+            "mean": 9.58,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 9.5,
+            "p95": 11.1,
+            "max": 17.1,
+            "mean": 9.43,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 9.5,
+            "p95": 10.8,
+            "max": 22.4,
+            "mean": 9.46,
+            "longFrames": 0
+          }
+        ],
+        "boxSelect": [
+          {
+            "steps": 62,
+            "median": 3.2,
+            "p95": 6.8,
+            "max": 8.5,
+            "mean": 3.73,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 3.1,
+            "p95": 6.9,
+            "max": 8.2,
+            "mean": 3.71,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 3.1,
+            "p95": 6.2,
+            "max": 8.1,
+            "mean": 3.55,
+            "longFrames": 0
+          }
+        ],
+        "connect": [
+          {
+            "steps": 62,
+            "median": 3.1,
+            "p95": 4.6,
+            "max": 19.3,
+            "mean": 3.46,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 3.1,
+            "p95": 4.8,
+            "max": 13.2,
+            "mean": 3.32,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 3,
+            "p95": 4.5,
+            "max": 13.6,
+            "mean": 3.25,
+            "longFrames": 0
+          }
+        ],
+        "select": [
+          {
+            "steps": 60,
+            "median": 6.1,
+            "p95": 7.3,
+            "max": 8,
+            "mean": 6.13,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 5.8,
+            "p95": 6.8,
+            "max": 6.9,
+            "mean": 5.8,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 5.6,
+            "p95": 6.9,
+            "max": 7.4,
+            "mean": 5.67,
+            "longFrames": 0
+          }
+        ],
+        "addRemove": [
+          {
+            "steps": 60,
+            "median": 16.6,
+            "p95": 21.8,
+            "max": 25.5,
+            "mean": 15.57,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 16.4,
+            "p95": 18.1,
+            "max": 21,
+            "mean": 14.84,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 15.7,
+            "p95": 17.5,
+            "max": 19.4,
+            "mean": 14.46,
+            "longFrames": 0
+          }
+        ]
+      },
+      "at": "2026-10-02T07:26:41.301Z"
+    },
+    {
+      "impl": "solid-graph",
+      "nodes": 200,
+      "edges": 241,
+      "previews": false,
+      "steps": 60,
+      "canvas": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "mountMs": 621,
+      "heapMB": 91.7,
+      "domNodes": 10184,
+      "results": {
+        "idle": {
+          "steps": 60,
+          "median": 0.1,
+          "p95": 0.5,
+          "max": 0.6,
+          "mean": 0.14,
+          "longFrames": 0
+        },
+        "pan": {
+          "steps": 60,
+          "median": 4.2,
+          "p95": 4.8,
+          "max": 4.8,
+          "mean": 3.95,
+          "longFrames": 0
+        },
+        "zoom": {
+          "steps": 60,
+          "median": 4,
+          "p95": 4.6,
+          "max": 4.8,
+          "mean": 3.89,
+          "longFrames": 0
+        },
+        "dragNode": {
+          "steps": 62,
+          "median": 3.5,
+          "p95": 7.4,
+          "max": 11.3,
+          "mean": 4.22,
+          "longFrames": 0
+        },
+        "dragAll": {
+          "steps": 62,
+          "median": 25.7,
+          "p95": 28.4,
+          "max": 66.7,
+          "mean": 26,
+          "longFrames": 2
+        },
+        "boxSelect": {
+          "steps": 62,
+          "median": 7.7,
+          "p95": 11.4,
+          "max": 13.3,
+          "mean": 7.89,
+          "longFrames": 1
+        },
+        "connect": {
+          "steps": 62,
+          "median": 7.4,
+          "p95": 9.3,
+          "max": 23.3,
+          "mean": 7.28,
+          "longFrames": 0
+        },
+        "select": {
+          "steps": 60,
+          "median": 9.4,
+          "p95": 10.9,
+          "max": 11.7,
+          "mean": 9.51,
+          "longFrames": 0
+        },
+        "addRemove": {
+          "steps": 60,
+          "median": 34.8,
+          "p95": 41,
+          "max": 43.3,
+          "mean": 33.25,
+          "longFrames": 2
+        }
+      },
+      "reps": {
+        "idle": [
+          {
+            "steps": 60,
+            "median": 0.1,
+            "p95": 0.4,
+            "max": 0.7,
+            "mean": 0.12,
+            "longFrames": 2
+          },
+          {
+            "steps": 60,
+            "median": 0.1,
+            "p95": 0.3,
+            "max": 0.4,
+            "mean": 0.1,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 0.1,
+            "p95": 0.5,
+            "max": 0.6,
+            "mean": 0.14,
+            "longFrames": 0
+          }
+        ],
+        "pan": [
+          {
+            "steps": 60,
+            "median": 3.7,
+            "p95": 4.4,
+            "max": 4.8,
+            "mean": 3.54,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 3.9,
+            "p95": 4.6,
+            "max": 4.7,
+            "mean": 3.68,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 4.2,
+            "p95": 4.8,
+            "max": 4.8,
+            "mean": 3.95,
+            "longFrames": 0
+          }
+        ],
+        "zoom": [
+          {
+            "steps": 60,
+            "median": 3.9,
+            "p95": 4.6,
+            "max": 4.7,
+            "mean": 3.94,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 3.9,
+            "p95": 4.5,
+            "max": 4.5,
+            "mean": 3.83,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 4,
+            "p95": 4.6,
+            "max": 4.8,
+            "mean": 3.89,
+            "longFrames": 0
+          }
+        ],
+        "dragNode": [
+          {
+            "steps": 62,
+            "median": 4.1,
+            "p95": 7.1,
+            "max": 22.1,
+            "mean": 4.79,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 3.7,
+            "p95": 7.2,
+            "max": 11.5,
+            "mean": 4.22,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 3.5,
+            "p95": 7.4,
+            "max": 11.3,
+            "mean": 4.22,
+            "longFrames": 0
+          }
+        ],
+        "dragAll": [
+          {
+            "steps": 62,
+            "median": 27.1,
+            "p95": 33,
+            "max": 69,
+            "mean": 27.29,
+            "longFrames": 2
+          },
+          {
+            "steps": 62,
+            "median": 25.5,
+            "p95": 30.7,
+            "max": 68.7,
+            "mean": 26.02,
+            "longFrames": 2
+          },
+          {
+            "steps": 62,
+            "median": 25.7,
+            "p95": 28.4,
+            "max": 66.7,
+            "mean": 26,
+            "longFrames": 2
+          }
+        ],
+        "boxSelect": [
+          {
+            "steps": 62,
+            "median": 7.9,
+            "p95": 11.6,
+            "max": 14.2,
+            "mean": 8.13,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 7.4,
+            "p95": 11.3,
+            "max": 13.2,
+            "mean": 7.74,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 7.7,
+            "p95": 11.4,
+            "max": 13.3,
+            "mean": 7.89,
+            "longFrames": 1
+          }
+        ],
+        "connect": [
+          {
+            "steps": 62,
+            "median": 7.7,
+            "p95": 10,
+            "max": 29.2,
+            "mean": 7.84,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 7.2,
+            "p95": 9.4,
+            "max": 24.5,
+            "mean": 7.35,
+            "longFrames": 0
+          },
+          {
+            "steps": 62,
+            "median": 7.4,
+            "p95": 9.3,
+            "max": 23.3,
+            "mean": 7.28,
+            "longFrames": 0
+          }
+        ],
+        "select": [
+          {
+            "steps": 60,
+            "median": 9.7,
+            "p95": 10.8,
+            "max": 12.6,
+            "mean": 9.74,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 9.6,
+            "p95": 10.8,
+            "max": 10.9,
+            "mean": 9.64,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 9.4,
+            "p95": 10.9,
+            "max": 11.7,
+            "mean": 9.51,
+            "longFrames": 0
+          }
+        ],
+        "addRemove": [
+          {
+            "steps": 60,
+            "median": 35.1,
+            "p95": 40.5,
+            "max": 47.8,
+            "mean": 34.23,
+            "longFrames": 1
+          },
+          {
+            "steps": 60,
+            "median": 34.1,
+            "p95": 45.8,
+            "max": 49.3,
+            "mean": 33.04,
+            "longFrames": 2
+          },
+          {
+            "steps": 60,
+            "median": 34.8,
+            "p95": 41,
+            "max": 43.3,
+            "mean": 33.25,
+            "longFrames": 2
+          }
+        ]
+      },
+      "at": "2026-10-02T07:27:42.617Z"
+    },
+    {
+      "impl": "solid-graph",
+      "nodes": 500,
+      "edges": 601,
+      "previews": false,
+      "steps": 60,
+      "canvas": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "mountMs": 1232,
+      "heapMB": 157,
+      "domNodes": 24975,
+      "results": {
+        "idle": {
+          "steps": 60,
+          "median": 0.9,
+          "p95": 1.5,
+          "max": 1.7,
+          "mean": 0.95,
+          "longFrames": 0
+        },
+        "pan": {
+          "steps": 60,
+          "median": 9.6,
+          "p95": 10.2,
+          "max": 10.3,
+          "mean": 8.74,
+          "longFrames": 0
+        },
+        "zoom": {
+          "steps": 60,
+          "median": 9,
+          "p95": 10.2,
+          "max": 10.5,
+          "mean": 7.64,
+          "longFrames": 0
+        },
+        "dragNode": {
+          "steps": 62,
+          "median": 8.6,
+          "p95": 17.8,
+          "max": 20,
+          "mean": 10.46,
+          "longFrames": 1
+        },
+        "dragAll": {
+          "steps": 62,
+          "median": 64.1,
+          "p95": 70.2,
+          "max": 487.6,
+          "mean": 69.78,
+          "longFrames": 62
+        },
+        "boxSelect": {
+          "steps": 62,
+          "median": 19.1,
+          "p95": 24.6,
+          "max": 34,
+          "mean": 18.43,
+          "longFrames": 1
+        },
+        "connect": {
+          "steps": 62,
+          "median": 19.2,
+          "p95": 24.3,
+          "max": 45.4,
+          "mean": 18.99,
+          "longFrames": 0
+        },
+        "select": {
+          "steps": 60,
+          "median": 21,
+          "p95": 22.3,
+          "max": 23.1,
+          "mean": 20.95,
+          "longFrames": 1
+        },
+        "addRemove": {
+          "steps": 60,
+          "median": 81.9,
+          "p95": 89,
+          "max": 112.6,
+          "mean": 78.2,
+          "longFrames": 56
+        }
+      },
+      "reps": {
+        "idle": [
+          {
+            "steps": 60,
+            "median": 1,
+            "p95": 1.6,
+            "max": 1.7,
+            "mean": 1.02,
+            "longFrames": 2
+          },
+          {
+            "steps": 60,
+            "median": 0.9,
+            "p95": 1.4,
+            "max": 1.7,
+            "mean": 0.88,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 0.9,
+            "p95": 1.5,
+            "max": 1.7,
+            "mean": 0.95,
+            "longFrames": 0
+          }
+        ],
+        "pan": [
+          {
+            "steps": 60,
+            "median": 9.6,
+            "p95": 10.1,
+            "max": 10.9,
+            "mean": 8.74,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 9.5,
+            "p95": 10.1,
+            "max": 10.2,
+            "mean": 8.62,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 9.6,
+            "p95": 10.2,
+            "max": 10.3,
+            "mean": 8.74,
+            "longFrames": 0
+          }
+        ],
+        "zoom": [
+          {
+            "steps": 60,
+            "median": 9,
+            "p95": 10.4,
+            "max": 10.6,
+            "mean": 7.63,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 9,
+            "p95": 9.9,
+            "max": 10.3,
+            "mean": 7.5,
+            "longFrames": 0
+          },
+          {
+            "steps": 60,
+            "median": 9,
+            "p95": 10.2,
+            "max": 10.5,
+            "mean": 7.64,
+            "longFrames": 0
+          }
+        ],
+        "dragNode": [
+          {
+            "steps": 62,
+            "median": 8,
+            "p95": 16.7,
+            "max": 32.2,
+            "mean": 10.3,
+            "longFrames": 1
+          },
+          {
+            "steps": 62,
+            "median": 8.1,
+            "p95": 17,
+            "max": 20.8,
+            "mean": 10.08,
+            "longFrames": 1
+          },
+          {
+            "steps": 62,
+            "median": 8.6,
+            "p95": 17.8,
+            "max": 20,
+            "mean": 10.46,
+            "longFrames": 1
+          }
+        ],
+        "dragAll": [
+          {
+            "steps": 62,
+            "median": 66.4,
+            "p95": 77.2,
+            "max": 490.3,
+            "mean": 72.23,
+            "longFrames": 62
+          },
+          {
+            "steps": 62,
+            "median": 63.8,
+            "p95": 74.1,
+            "max": 496.4,
+            "mean": 70.38,
+            "longFrames": 62
+          },
+          {
+            "steps": 62,
+            "median": 64.1,
+            "p95": 70.2,
+            "max": 487.6,
+            "mean": 69.78,
+            "longFrames": 62
+          }
+        ],
+        "boxSelect": [
+          {
+            "steps": 62,
+            "median": 19.3,
+            "p95": 26.1,
+            "max": 31.8,
+            "mean": 18.73,
+            "longFrames": 1
+          },
+          {
+            "steps": 62,
+            "median": 19.5,
+            "p95": 26.6,
+            "max": 30,
+            "mean": 18.83,
+            "longFrames": 1
+          },
+          {
+            "steps": 62,
+            "median": 19.1,
+            "p95": 24.6,
+            "max": 34,
+            "mean": 18.43,
+            "longFrames": 1
+          }
+        ],
+        "connect": [
+          {
+            "steps": 62,
+            "median": 19.3,
+            "p95": 23.8,
+            "max": 56,
+            "mean": 19.2,
+            "longFrames": 1
+          },
+          {
+            "steps": 62,
+            "median": 19.2,
+            "p95": 24,
+            "max": 49.4,
+            "mean": 18.96,
+            "longFrames": 1
+          },
+          {
+            "steps": 62,
+            "median": 19.2,
+            "p95": 24.3,
+            "max": 45.4,
+            "mean": 18.99,
+            "longFrames": 0
+          }
+        ],
+        "select": [
+          {
+            "steps": 60,
+            "median": 21.3,
+            "p95": 22.7,
+            "max": 24.1,
+            "mean": 21.34,
+            "longFrames": 1
+          },
+          {
+            "steps": 60,
+            "median": 20.9,
+            "p95": 22.1,
+            "max": 22.5,
+            "mean": 20.89,
+            "longFrames": 1
+          },
+          {
+            "steps": 60,
+            "median": 21,
+            "p95": 22.3,
+            "max": 23.1,
+            "mean": 20.95,
+            "longFrames": 1
+          }
+        ],
+        "addRemove": [
+          {
+            "steps": 60,
+            "median": 82,
+            "p95": 97,
+            "max": 103.4,
+            "mean": 78.7,
+            "longFrames": 56
+          },
+          {
+            "steps": 60,
+            "median": 82,
+            "p95": 89.4,
+            "max": 90.4,
+            "mean": 78.16,
+            "longFrames": 56
+          },
+          {
+            "steps": 60,
+            "median": 81.9,
+            "p95": 89,
+            "max": 112.6,
+            "mean": 78.2,
+            "longFrames": 56
+          }
+        ]
+      },
+      "at": "2026-10-02T07:29:35.170Z"
+    }
+  ]
+}

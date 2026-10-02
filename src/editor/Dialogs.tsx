@@ -403,7 +403,7 @@ async function renderGraphImage(ed: Editor, opts: { scale: number; background: b
   }
   const pos = (id: string, side: "in" | "out", key: string) => {
     const n = ed.nodesById().get(id)!;
-    const off = ed.layout[id]?.handles[`${side}:${key}`];
+    const off = ed.handleOffsets(id)[`${side}:${key}`];
     const s = ed.nodeSize(n);
     return { x: n.position.x + (off?.x ?? (side === "out" ? s.w : 0)), y: n.position.y + (off?.y ?? 30) };
   };
@@ -468,7 +468,7 @@ async function renderGraphImage(ed: Editor, opts: { scale: number; background: b
     ctx.fillText(nodeTitle(ed.state.doc, n).toUpperCase(), x + 12, y + 18);
     ctx.letterSpacing = "1px";
     ctx.font = "500 10px Geist Variable, sans-serif";
-    const handles = ed.layout[n.id]?.handles ?? {};
+    const handles = ed.handleOffsets(n.id);
     for (const [hk, off] of Object.entries(handles)) {
       const [side, key] = hk.split(":");
       const t = side === "in" ? ed.types().get(n.id)?.in[key] : ed.types().get(n.id)?.out[key];

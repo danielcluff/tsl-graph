@@ -6,5 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   root: "playground",
   plugins: [solid(), tailwindcss()],
+  // solid-graph is a workspace package (packages/solid-graph): one Solid for both
+  resolve: { dedupe: ["solid-js", "@solidjs/web"] },
   build: { target: "esnext", chunkSizeWarningLimit: 4000, outDir: "../dist", emptyOutDir: true },
 });
