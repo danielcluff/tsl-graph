@@ -150,6 +150,35 @@ Test the chat loop without keys: `PORT=5199 npx tsx scripts/mock-ai.ts`, then st
 `ANTHROPIC_BASE_URL=http://127.0.0.1:5199 OPENAI_BASE_URL=http://127.0.0.1:5199/v1 GEMINI_BASE_URL=http://127.0.0.1:5199`
 and enter any key on the playground page. `scripts/mcp-smoke.ts` drives a full agent session over MCP.
 
+### Updating solid-graph
+
+tsl-graph pins one solid-graph commit; the submodule sits on that commit, not on a branch (that's normal). To move to
+a newer solid-graph:
+
+1. Push the solid-graph change to its `main`. (Or work in `packages/solid-graph` directly: `git checkout main` there
+   first, then commit and push from that directory.)
+2. In tsl-graph, check out solid-graph's latest `main`:
+
+   ```bash
+   git submodule update --remote packages/solid-graph
+   pnpm install
+   ```
+
+3. Check behaviour and speed against the last results, with the playground running (`pnpm dev`):
+
+   ```bash
+   pnpm typecheck && pnpm test && pnpm test:e2e
+   pnpm bench --label solid-graph-next
+   pnpm bench --compare bench/results/solid-graph.json bench/results/solid-graph-next.json
+   ```
+
+4. Commit the new pointer (`git add packages/solid-graph`), plus the new results if you want to keep them. When
+   merging solid-graph PRs, use a merge commit rather than squash or rebase if a tsl-graph commit already pins one of
+   the PR's commits, so the pinned commit stays on `main`.
+
+After pulling a tsl-graph commit that moved the pointer, run `git submodule update` (and `pnpm install`) to check out
+the pinned commit.
+
 ### Styles
 
 Hosts without their own Tailwind build import `tsl-graph/styles.css`. Hosts that have one import the editor's part into
