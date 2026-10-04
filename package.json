@@ -11,7 +11,8 @@
     "./server": "./src/server/index.ts",
     "./styles.css": "./src/styles.css",
     "./editor.css": "./src/editor.css",
-    "./particle": "./src/runtime/particle.ts"
+    "./particle": "./src/runtime/particle.ts",
+    "./targets": "./src/runtime/targets.ts"
   },
   "bin": {
     "tsl-graph-mcp": "./scripts/mcp-stdio.mjs"

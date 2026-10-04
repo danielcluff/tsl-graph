@@ -4,7 +4,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 import type { ProviderId } from "../../host";
-import { INSTRUCTIONS, runTool, type ToolResult, type ToolSpec } from "../tools";
+import { instructions, runTool, type ToolResult, type ToolSpec } from "../tools";
 import { anthropic } from "./anthropic";
 import { google } from "./google";
 import { openai } from "./openai";
@@ -14,7 +14,7 @@ export const PROVIDERS: Record<ProviderId, ProviderAdapter> = { anthropic, opena
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 const MAX_TURNS = 40;
 
-const SYSTEM = `${INSTRUCTIONS}
+const system = () => `${instructions()}
 
 You are the assistant built into the TSL Graph editor. The user is looking at their project in the editor right now, and every tool call you make shows up live on their canvas (and can be undone with Ctrl/Cmd+Z). The tools always act on the open project, so never pass a projectId.
 
@@ -173,7 +173,7 @@ export function createChat(opts: ChatOptions) {
       for (let turn = 0; turn < MAX_TURNS && !controller.signal.aborted; turn++) {
         const step = await provider.step({
           history,
-          system: SYSTEM,
+          system: system(),
           tools: DESCRIPTORS,
           apiKey,
           model,

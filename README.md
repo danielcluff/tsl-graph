@@ -21,27 +21,39 @@ tools. It is meant to be embedded in a parent application, which owns projects a
 | `tsl-graph/ui`         | browser  | The UI kit the editor uses (Button, Dialog, Popover, …) and `setTheme`             |
 | `tsl-graph/server`     | Node     | `createGraphServer()` (MCP + bridge + AI chat), `createFileStore()`                |
 | `tsl-graph/particle`   | browser  | `createParticleShader(project)`: a particle shader as elate-particles calls it      |
+| `tsl-graph/targets`    | browser  | `createTargetFunction(project)`, `registerTargetPreview(id, preview)`              |
 | `tsl-graph/styles.css` | browser  | Complete editor styles, Tailwind included                                          |
 | `tsl-graph/editor.css` | browser  | Editor styles for hosts with their own Tailwind v4 build (see Styles)              |
 
-## Particle shaders
+## Targets
 
-A project is a **material** (material + post graphs, the default) or a **particle shader** (`kind: "particle"`, one
-`particle` graph): the look of each particle of an [elate-particles](https://github.com/danielcluff/elate-particles)
-sprite renderer.
+A project's **target** is the contract its exported module follows, so the module drops into the code that uses it.
+Without one, a project is a plain material (material + post graphs, exported with demo wiring).
 
-- **Inputs** (category *Particle*): Particle Age (0..1 over life), Particle Life, Particle Seed, Particle Velocity,
-  Particle Color (base colour × colour over life, RGBA), Sprite UV and Sprite Shape (the renderer's mask or texture,
-  RGBA). **Particle Output** takes Color (vec3) and Opacity (float); an unconnected one keeps the renderer's own colour ×
-  shape.
-- **Compiling:** the inputs compile to free identifiers (`particleAge`, …, see `PARTICLE_INPUTS`), so one body serves
-  everywhere. The exported module is `export function particleShader({ age, seed, … }) { …; return { color, opacity } }`.
-- **At runtime:** `createParticleShader(doc)` (from `tsl-graph/particle`) returns the function to give
-  `new ParticleWorld({ shaders: (id) => … })`; a sprite renderer with `material: { kind: "graph", shaderId }` uses it.
-  After an edit, rebuild it and call `world.invalidateShader(id)`.
-- **Preview:** the main view shows a fountain of test sprites; node thumbnails show a 3×3 grid of sprites whose age runs
-  from 0 (top left) to 1 (bottom right), so each node shows how its value changes over a particle's life.
-- Create one from the *Particle Shader* / *Particle: Hot Core* templates, or `create_project` with `kind: "particle"`.
+- **Function targets** have one graph, `function`, from the target's inputs to its outputs. Each input is a node in the
+  target's category; the target's output node takes what the function returns (an unconnected output returns `null`).
+  The module exports the function: `export function particleShader({ age, seed, … }) { …; return { color, opacity } }`,
+  or `export const name: Type = (…) => …` when the target declares a type.
+- **Material targets** edit the material graph only and export a factory, `export function createX(options = {})`,
+  returning the material. Their inputs are the factory's options: nodes that read `options.key ?? default` (previews
+  use the default).
+- **Built in:** `particle`, the look of each particle of an
+  [elate-particles](https://github.com/danielcluff/elate-particles) sprite renderer. Inputs (category *Particle*):
+  age (0..1 over life), seed, life, velocity, colour (base colour × colour over life, RGBA), sprite UV and the sprite's
+  shape (mask or texture, RGBA). Outputs: colour (vec3) and opacity (float); `null` keeps the renderer's own.
+- **Your own:** `registerTarget({ id, label, base, category, inputs, outputs, exportName, declarations, typeImports,
+  type | optionsType, starter })`, in every place that compiles or edits projects (server and browser). For a function
+  target, also tell the editor how to preview it: `registerTargetPreview(id, { apply(evaluate, previous, ctx),
+  thumbnailInputs(), animated })` from `tsl-graph/targets`. A host can re-register `particle` (e.g. to type the module).
+- **Compiling:** inputs compile to free identifiers (`particleAge`, see `targetInputIdent`), so one body serves the
+  module, the preview and the runtime. Only identifiers the code uses are imported.
+- **At runtime:** `createTargetFunction(doc)` returns a function target as its consumer calls it;
+  `createParticleShader(doc)` (from `tsl-graph/particle`) is the same for elate-particles: give it to
+  `new ParticleWorld({ shaders: (id) => … })` and call `world.invalidateShader(id)` after an edit.
+- **Preview:** particle shaders show a fountain of test sprites; node thumbnails show a 3×3 grid of sprites whose age
+  runs from 0 (top left) to 1 (bottom right).
+- Create one with `createProject(name, target)`, from the *Particle Shader* / *Particle: Hot Core* templates, or with
+  `create_project` and `target`. Projects from before targets (`kind: "particle"`) load as `target: "particle"`.
 
 ## Embedding
 
@@ -226,7 +238,7 @@ uses `tsl-graph/ui` for its own pages, call `setTheme("dark" | "light")` so its 
 
 ```
 src/core/      framework-free graph model, node registry, commands, TSL compiler, layout, templates, importers
-src/runtime/   TSL evaluation scope + WebGPU preview renderer, particle shader evaluation (particle.ts)
+src/runtime/   TSL evaluation scope + WebGPU preview renderer, target evaluation and previews (targets.ts, particle.ts)
 src/editor/    Solid editor UI (GraphEditor, panels, AI chat client, bridge client)
 src/ui/        UI kit + theme
 src/server/    graph server: MCP, bridge, tool table (tools.ts, shared by MCP and chat), ai/ provider adapters

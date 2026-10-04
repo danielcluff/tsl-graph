@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { createProject, nodeCount, normalizeDoc } from "../core/graph";
+import { createProject, nodeCount, normalizeDoc, projectKind } from "../core/graph";
 import type { ProjectDoc, ProjectSummary } from "../core/types";
 import type { ProjectStore } from "../host";
 
@@ -36,7 +36,8 @@ export function createFileStore(dir: string): FileStore {
       for (const f of (await readdir(root)).filter((f) => f.endsWith(".json"))) {
         try {
           const doc = JSON.parse(await readFile(join(root, f), "utf8")) as ProjectDoc;
-          out.push({ id: doc.id, name: doc.name, kind: doc.kind ?? "material", createdAt: doc.createdAt, updatedAt: doc.updatedAt, thumbnail: doc.thumbnail, nodeCount: nodeCount(doc) });
+          normalizeDoc(doc);
+          out.push({ id: doc.id, name: doc.name, kind: projectKind(doc), ...(doc.target ? { target: doc.target } : {}), createdAt: doc.createdAt, updatedAt: doc.updatedAt, thumbnail: doc.thumbnail, nodeCount: nodeCount(doc) });
         } catch {
           // skip unreadable files
         }
@@ -52,7 +53,7 @@ export function createFileStore(dir: string): FileStore {
     },
     save,
     async create(name, from) {
-      const doc = createProject(name || "Untitled", from?.kind === "particle" ? "particle" : "material");
+      const doc = createProject(name || "Untitled", from?.target);
       if (from) {
         if (from.graphs) doc.graphs = { ...doc.graphs, ...from.graphs };
         if (from.globals) doc.globals = from.globals;

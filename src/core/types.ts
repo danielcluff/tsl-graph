@@ -70,8 +70,10 @@ export type NodeKind =
   | "postInput"
   | "postOutput"
   | "postScene"
-  /** The particle graph's output (colour / opacity of each particle). */
-  | "particleOutput"
+  /** A function target's input (particle age, shield fresnel, …) or a material target's option. */
+  | "targetInput"
+  /** A function target's output node (e.g. particle colour / opacity). */
+  | "targetOutput"
   | "textureSample"
   | "gradient"
   | "portal"
@@ -96,17 +98,22 @@ export interface NodeDef {
   kind?: NodeKind;
   /** Graph this node is allowed in. Defaults to both. */
   graphs?: GraphKind[];
+  /** Only in projects of these targets (see core/targets). */
+  targets?: string[];
   keywords?: string[];
 }
 
 /**
  * material: a mesh material (with "post" for post-processing).
- * particle: the look of each particle of an elate-particles sprite renderer;
- * inputs are per-particle values (age, seed, colour, sprite UV…).
+ * function: a function target's graph, from the target's inputs (particle age,
+ * shield fresnel, …) to its outputs (see core/targets).
  */
-export type GraphKind = "material" | "post" | "particle";
-/** What a project makes: a material (material + post graphs) or a particle shader (particle graph). */
-export type ProjectKind = "material" | "particle";
+export type GraphKind = "material" | "post" | "function";
+/**
+ * What a project makes, from its target: a material (material + post graphs),
+ * or a function (the function graph).
+ */
+export type ProjectKind = "material" | "function";
 /** A graph address: a top-level graph or a subgraph body (`sg:<subgraphId>`). */
 export type GraphRef = GraphKind | `sg:${string}`;
 
@@ -272,8 +279,11 @@ export interface ProjectDoc {
   createdAt: number;
   updatedAt: number;
   version: 1;
-  /** Default "material". */
-  kind?: ProjectKind;
+  /**
+   * The contract the project's module follows (core/targets), e.g. "particle".
+   * None: a plain material, exported with demo wiring.
+   */
+  target?: string;
   thumbnail?: string;
   graphs: Record<GraphKind, Graph>;
   globals: GlobalDef[];
@@ -284,7 +294,9 @@ export interface ProjectDoc {
 export interface ProjectSummary {
   id: string;
   name: string;
+  /** From the target: "function" projects edit one function graph. */
   kind?: ProjectKind;
+  target?: string;
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;

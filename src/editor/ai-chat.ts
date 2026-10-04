@@ -1,5 +1,7 @@
 import { createContext, createStore, flush, snapshot, untrack } from "solid-js";
+import { projectKind } from "../core/graph";
 import { getNodeDef } from "../core/registry";
+import { getTarget } from "../core/targets";
 import type { GraphHost, ProviderId } from "../host";
 import { serverHeaders, serverUrl } from "./host";
 import type { Editor } from "./store";
@@ -201,9 +203,10 @@ export function createChat(ed: Editor, host: GraphHost) {
       "<editor_state>",
       `project: ${ed.state.doc.name}`,
       `active graph: ${g.startsWith("sg:") ? "subgraph (editing)" : g}`,
-      ed.state.doc.kind === "particle"
-        ? `particle shader: ${ed.state.doc.graphs.particle.nodes.length} nodes`
-        : `material graph: ${ed.state.doc.graphs.material.nodes.length} nodes, post graph: ${ed.state.doc.graphs.post.nodes.length} nodes`,
+      ed.state.doc.target ? `target: ${ed.state.doc.target} (${getTarget(ed.state.doc.target)?.label ?? "unknown"})` : "target: none (plain material)",
+      projectKind(ed.state.doc) === "function"
+        ? `function graph: ${ed.state.doc.graphs.function.nodes.length} nodes`
+        : `material graph: ${ed.state.doc.graphs.material.nodes.length} nodes${ed.state.doc.target ? "" : `, post graph: ${ed.state.doc.graphs.post.nodes.length} nodes`}`,
       selected.length ? `selected: ${selected.join(", ")}` : "selected: nothing",
       problems.length ? `problems:\n${problems.slice(0, 8).join("\n")}` : "problems: none",
       "</editor_state>",

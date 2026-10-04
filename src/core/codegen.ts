@@ -1,6 +1,7 @@
 import { LOOP_COMPARES, findGlobal, findSubgraph, loopModeOf, resolvePorts } from "./graph";
 import { multiOpHandleId, multiOpInfo } from "./multiop";
 import { getNodeDef } from "./registry";
+import { getTarget, PARTICLE_TARGET, targetInputIdent, targetOutputType, type ShaderTarget, type TargetInput } from "./targets";
 import exportsList from "./tsl-exports.json";
 import { UTIL_SOURCES, utilClosure } from "./tsl-utils";
 import type {
@@ -31,45 +32,42 @@ export interface GraphOutput {
 }
 
 /**
- * Free identifiers a particle graph reads (Particle Age, …). Whoever evaluates
- * `runtime.particle` passes them as parameters, in this order (see
- * runtime/particle.ts); the exported module takes them as one object.
+ * Free identifiers a particle graph reads (Particle Age, …), in the order
+ * `runtime.function` takes them. Kept for callers from before targets; see
+ * targetInputIdent for any target.
  */
-export const PARTICLE_INPUTS = [
-  { ident: "particleAge", key: "age" },
-  { ident: "particleSeed", key: "seed" },
-  { ident: "particleLife", key: "life" },
-  { ident: "particleVelocity", key: "velocity" },
-  { ident: "particleColor", key: "color" },
-  { ident: "particleUv", key: "uv" },
-  { ident: "particleShape", key: "shape" },
-] as const;
+export const PARTICLE_INPUTS = PARTICLE_TARGET.inputs.map((i) => ({ ident: targetInputIdent(PARTICLE_TARGET, i.key), key: i.key }));
 
 export interface CompileResult {
-  /** Complete, self-contained ES module. */
+  /** Complete, self-contained ES module (the target's contract when the project has one). */
   code: string;
   /**
    * Function bodies evaluated by the live preview (see runtime/scope.ts).
-   * `particle` takes the PARTICLE_INPUTS identifiers as parameters.
+   * `function` takes the target's input identifiers as parameters, in the
+   * order of its inputs (see runtime/targets.ts).
    */
-  runtime: { material: string; post: string; particle: string };
+  runtime: { material: string; post: string; function: string };
   material: GraphOutput;
   post: GraphOutput & { connected: boolean };
-  /** Particle shader projects: the particle graph, and which outputs are connected. */
-  particle: GraphOutput & { color: boolean; opacity: boolean };
+  /** Function-target projects: the function graph, and which outputs are connected. */
+  function: GraphOutput & { connected: Record<string, boolean> };
   globals: Record<string, string>;
   diagnostics: Diagnostic[];
   utils: string[];
 }
 
 export function compileProject(doc: ProjectDoc): CompileResult {
-  if (doc.kind === "particle") return compileParticleProject(doc);
+  const target = getTarget(doc.target);
   const diagnostics: Diagnostic[] = [];
+  if (doc.target !== undefined && !target) diagnostics.push({ level: "error", message: `Unknown target "${doc.target}" (register it before compiling)` });
+  if (target?.base === "function") return compileFunctionProject(doc, target);
   const utilsUsed = new Set<string>();
   const shared: Shared = { doc, diagnostics, utilsUsed, failed: new Set() };
 
   const globalsOut = emitGlobals(doc);
-  const material = compileMaterialGraph(shared, globalsOut.names);
+  const options = target ? target.inputs.map((i) => targetInputIdent(target, i.key)) : [];
+  const material = compileMaterialGraph(shared, globalsOut.names, [...options, "options"]);
+  if (target) return compileMaterialFactory(doc, target, shared, globalsOut, material);
   const post = compilePostGraph(shared, globalsOut.names);
   const subgraphLines = [...material.subgraphLines, ...post.subgraphLines];
   const subgraphs = dedupeBlocks(subgraphLines);
@@ -129,7 +127,7 @@ export function compileProject(doc: ProjectDoc): CompileResult {
 
   return {
     code,
-    runtime: { material: runtimeMaterial, post: runtimePost, particle: NO_PARTICLE_BODY },
+    runtime: { material: runtimeMaterial, post: runtimePost, function: NO_FUNCTION_BODY },
     material: { lines: material.lines, nodes: material.nodes, uniforms: material.uniforms, ok: material.ok },
     post: {
       lines: post.lines,
@@ -138,7 +136,7 @@ export function compileProject(doc: ProjectDoc): CompileResult {
       ok: post.ok,
       connected: post.connected,
     },
-    particle: { lines: [], nodes: {}, uniforms: {}, ok: false, color: false, opacity: false },
+    function: { lines: [], nodes: {}, uniforms: {}, ok: false, connected: {} },
     globals: globalsOut.names,
     diagnostics,
     utils,
@@ -147,58 +145,138 @@ export function compileProject(doc: ProjectDoc): CompileResult {
 
 const NO_MATERIAL_BODY = "return { material: null, nodes: {}, uniforms: {} };";
 const NO_POST_BODY = "return { outputNode: null, nodes: {}, uniforms: {} };";
-const NO_PARTICLE_BODY = "return { color: null, opacity: null, nodes: {}, uniforms: {} };";
+const NO_FUNCTION_BODY = "return { nodes: {}, uniforms: {} };";
 
-/** A particle shader: one graph, compiled to a function of the particle inputs. */
-function compileParticleProject(doc: ProjectDoc): CompileResult {
-  const diagnostics: Diagnostic[] = [];
-  const utilsUsed = new Set<string>();
-  const shared: Shared = { doc, diagnostics, utilsUsed, failed: new Set() };
-  const globalsOut = emitGlobals(doc);
-  const particle = compileParticleGraph(shared, globalsOut.names);
-  const subgraphs = dedupeBlocks(particle.subgraphLines);
-  const utils = utilClosure(utilsUsed);
+/** Module lines shared by every target: header, imports, type imports and declarations. */
+function moduleHead(target: ShaderTarget, bodyText: string, addons: { name: string; from: string }[]): string[] {
+  const head = [...(target.header ?? [])];
+  head.push(...buildImports(bodyText, addons));
+  for (const ti of target.typeImports ?? []) head.push(`import type { ${ti.names.join(", ")} } from '${ti.from}';`);
+  if (target.declarations?.length) head.push("", ...target.declarations);
+  return head;
+}
+
+/** A material target's option as a node: `options.key ?? default` in the module, the default in previews. */
+function optionDecl(target: ShaderTarget, input: TargetInput, preview: boolean): string {
+  const ident = targetInputIdent(target, input.key);
+  const fallback = input.default ?? (input.type === "color" ? "#ffffff" : /^vec/.test(input.type) ? new Array(Number(input.type.slice(3))).fill(0) : 0);
+  const lit = JSON.stringify(fallback);
+  const prop = /^[A-Za-z_$][\w$]*$/.test(input.key) ? `options.${input.key}` : `options[${JSON.stringify(input.key)}]`;
+  const value = preview ? lit : `${prop} ?? ${lit}`;
+  const node =
+    input.type === "color"
+      ? `color(${value})`
+      : /^vec[234]$/.test(input.type)
+        ? `${input.type}(...${preview ? lit : `(${value})`})`
+        : input.type === "bool"
+          ? `bool(${value})`
+          : input.type === "int"
+            ? `int(${value})`
+            : `float(${value})`;
+  return `const ${ident} = ${node};`;
+}
+
+/** A material target: the material graph inside a factory `(options) => material`. */
+function compileMaterialFactory(
+  doc: ProjectDoc,
+  target: ShaderTarget,
+  shared: Shared,
+  globalsOut: { lines: string[]; names: Record<string, string> },
+  material: DriverResult,
+): CompileResult {
+  const subgraphs = dedupeBlocks(material.subgraphLines);
+  const utils = utilClosure(shared.utilsUsed);
   const utilCode = utils.map((u) => UTIL_SOURCES[u].code);
-  const ret = `return { color: ${particle.colorExpr ?? "null"}, opacity: ${particle.opacityExpr ?? "null"}`;
+  const indent = (l: string) => (l ? `  ${l}` : l);
 
-  // -- exported module: a function the elate-particles runtime calls per sprite material
   const body: string[] = [];
   if (utilCode.length) body.push("// Inline TSL Utils", ...utilCode, "");
   if (globalsOut.lines.length) body.push("// Globals", ...globalsOut.lines, "");
   if (subgraphs.length) body.push(...subgraphs, "");
   body.push(
-    "// Particle Graph",
-    "// Give it to elate-particles: new ParticleWorld({ shaders: (id) => (id === SHADER_ID ? particleShader : undefined) })",
-    "// A null `color` / `opacity` keeps the renderer's own (colour × shape).",
-    `export function particleShader({ ${PARTICLE_INPUTS.map((i) => `${i.key}: ${i.ident}`).join(", ")} }) {`,
-    ...particle.lines.map((l) => (l ? `  ${l}` : l)),
-    `  ${ret} };`,
+    `export function ${target.exportName}(options${target.optionsType ? `: ${target.optionsType}` : ""} = {}) {`,
+    ...(target.inputs.length ? ["  // Options", ...target.inputs.map((i) => indent(optionDecl(target, i, false))), ""] : []),
+    ...material.lines.map(indent),
+    `  return ${material.ok ? "material" : "null"};`,
     "}",
+    "",
+    `export default ${target.exportName};`,
   );
   const bodyText = body.join("\n");
-  const code = [...buildImports(bodyText, particle.addonImports), "", bodyText, ""].join("\n");
+  const code = [...moduleHead(target, bodyText, material.addonImports), "", bodyText, ""].join("\n");
 
-  const runtimeParticle = [
+  const runtimeMaterial = [
     ...utilCode,
     ...globalsOut.lines,
     ...subgraphs,
-    ...particle.lines,
-    `${ret}, nodes: { ${objEntries(particle.nodes)} }, uniforms: { ${objEntries({ ...particle.uniforms, ...prefixKeys(globalsOut.names, "global:") })} } };`,
+    ...target.inputs.map((i) => optionDecl(target, i, true)),
+    ...material.lines,
+    `return { material: ${material.ok ? "material" : "null"}, nodes: { ${objEntries(material.nodes)} }, uniforms: { ${objEntries({
+      ...material.uniforms,
+      ...prefixKeys(globalsOut.names, "global:"),
+    })} } };`,
+  ].join("\n");
+  const none = { lines: [], nodes: {}, uniforms: {}, ok: false };
+  return {
+    code,
+    runtime: { material: runtimeMaterial, post: NO_POST_BODY, function: NO_FUNCTION_BODY },
+    material: { lines: material.lines, nodes: material.nodes, uniforms: material.uniforms, ok: material.ok },
+    post: { ...none, connected: false },
+    function: { ...none, connected: {} },
+    globals: globalsOut.names,
+    diagnostics: shared.diagnostics,
+    utils,
+  };
+}
+
+/** A function target: one graph, compiled to a function of the target's inputs. */
+function compileFunctionProject(doc: ProjectDoc, target: ShaderTarget): CompileResult {
+  const diagnostics: Diagnostic[] = [];
+  const utilsUsed = new Set<string>();
+  const shared: Shared = { doc, diagnostics, utilsUsed, failed: new Set() };
+  const globalsOut = emitGlobals(doc);
+  const fn = compileFunctionGraph(shared, globalsOut.names, target);
+  const subgraphs = dedupeBlocks(fn.subgraphLines);
+  const utils = utilClosure(utilsUsed);
+  const utilCode = utils.map((u) => UTIL_SOURCES[u].code);
+  const outputs = target.outputs!.map((o) => `${o.key}: ${fn.exprs[o.key] ?? "null"}`).join(", ");
+  const params = `{ ${target.inputs.map((i) => `${i.key}: ${targetInputIdent(target, i.key)}`).join(", ")} }`;
+
+  const body: string[] = [];
+  if (utilCode.length) body.push("// Inline TSL Utils", ...utilCode, "");
+  if (globalsOut.lines.length) body.push("// Globals", ...globalsOut.lines, "");
+  if (subgraphs.length) body.push(...subgraphs, "");
+  body.push(
+    target.type ? `export const ${target.exportName}: ${target.type} = (${params}) => {` : `export function ${target.exportName}(${params}) {`,
+    ...fn.lines.map((l) => (l ? `  ${l}` : l)),
+    `  return { ${outputs} };`,
+    target.type ? "};" : "}",
+    "",
+    `export default ${target.exportName};`,
+  );
+  const bodyText = body.join("\n");
+  const code = [...moduleHead(target, bodyText, fn.addonImports), "", bodyText, ""].join("\n");
+
+  const runtimeFunction = [
+    ...utilCode,
+    ...globalsOut.lines,
+    ...subgraphs,
+    ...fn.lines,
+    `return { ${outputs}, nodes: { ${objEntries(fn.nodes)} }, uniforms: { ${objEntries({ ...fn.uniforms, ...prefixKeys(globalsOut.names, "global:") })} } };`,
   ].join("\n");
 
   const none = { lines: [], nodes: {}, uniforms: {}, ok: false };
   return {
     code,
-    runtime: { material: NO_MATERIAL_BODY, post: NO_POST_BODY, particle: runtimeParticle },
+    runtime: { material: NO_MATERIAL_BODY, post: NO_POST_BODY, function: runtimeFunction },
     material: none,
     post: { ...none, connected: false },
-    particle: {
-      lines: particle.lines,
-      nodes: particle.nodes,
-      uniforms: particle.uniforms,
-      ok: particle.ok,
-      color: !!particle.colorExpr,
-      opacity: !!particle.opacityExpr,
+    function: {
+      lines: fn.lines,
+      nodes: fn.nodes,
+      uniforms: fn.uniforms,
+      ok: fn.ok,
+      connected: Object.fromEntries(target.outputs!.map((o) => [o.key, !!fn.exprs[o.key]])),
     },
     globals: globalsOut.names,
     diagnostics,
@@ -546,7 +624,7 @@ function topoOrder(scope: Scope, nodes: GraphNode[], collapse: (id: string) => s
   return sorted;
 }
 
-const SKIP_KINDS = new Set(["comment", "group", "material", "postOutput", "particleOutput", "subgraphOutput"]);
+const SKIP_KINDS = new Set(["comment", "group", "material", "postOutput", "targetOutput", "subgraphOutput"]);
 
 function compileNodes(scope: Scope, nodes: GraphNode[], container?: string) {
   // Nodes inside a loop container compile inside that loop; for ordering the
@@ -1096,9 +1174,10 @@ interface DriverResult {
   addonImports: { name: string; from: string }[];
 }
 
-function compileMaterialGraph(shared: Shared, globals: Record<string, string>): DriverResult {
+function compileMaterialGraph(shared: Shared, globals: Record<string, string>, reserved: string[] = []): DriverResult {
   const graph = shared.doc.graphs.material;
   const scope = newScope(shared, "material", graph, globals);
+  for (const name of reserved) scope.names.add(name);
   compileNodes(scope, graph.nodes);
 
   const materials = graph.nodes.filter((n) => getNodeDef(n.type)?.kind === "material");
@@ -1229,42 +1308,51 @@ function compilePostGraph(
   };
 }
 
-function compileParticleGraph(
+/** Cast an output expression to its port type, so a scalar into a vec3 port (or a vec4 into a float port) still fits. */
+function castTo(type: string, expr: string): string {
+  if (type === "float") return `float(${expr})`;
+  if (/^vec[234]$/.test(type)) return `${type}(${expr})`;
+  if (type === "color") return `vec3(${expr})`;
+  return expr;
+}
+
+function compileFunctionGraph(
   shared: Shared,
   globals: Record<string, string>,
-): DriverResult & { colorExpr: string | null; opacityExpr: string | null } {
-  const graph = shared.doc.graphs.particle;
-  const scope = newScope(shared, "particle", graph, globals);
-  for (const i of PARTICLE_INPUTS) scope.names.add(i.ident);
+  target: ShaderTarget,
+): DriverResult & { exprs: Record<string, string | null> } {
+  const graph = shared.doc.graphs.function;
+  const scope = newScope(shared, "function", graph, globals);
+  for (const i of target.inputs) scope.names.add(targetInputIdent(target, i.key));
   compileNodes(scope, graph.nodes);
-  const outs = graph.nodes.filter((n) => n.type === "particle/output");
+  const outType = targetOutputType(target);
+  const label = `${target.category} Output`;
+  const outs = graph.nodes.filter((n) => n.type === outType);
   const result = { lines: scope.lines, nodes: scope.nodesOut, uniforms: scope.uniformsOut, subgraphLines: scope.subgraphLines, addonImports: scope.addonImports };
+  const none = Object.fromEntries(target.outputs!.map((o) => [o.key, null]));
   if (!outs.length) {
-    shared.diagnostics.push({ level: "error", message: "Particle Output is missing", graph: "particle" });
-    return { ...result, ok: false, colorExpr: null, opacityExpr: null };
+    shared.diagnostics.push({ level: "error", message: `${label} is missing`, graph: "function" });
+    return { ...result, ok: false, exprs: none };
   }
-  for (const extra of outs.slice(1))
-    shared.diagnostics.push({ level: "warning", message: "Only the first Particle Output is used", nodeId: extra.id, graph: "particle" });
+  for (const extra of outs.slice(1)) shared.diagnostics.push({ level: "warning", message: `Only the first ${label} is used`, nodeId: extra.id, graph: "function" });
   const out = outs[0];
   let ok = true;
-  const port = (key: "color" | "opacity") => {
-    const e = incomingEdge(scope, out.id, key);
-    if (!e) return null;
+  const exprs: Record<string, string | null> = {};
+  for (const o of target.outputs!) {
+    const e = incomingEdge(scope, out.id, o.key);
+    exprs[o.key] = null;
+    if (!e) continue;
     try {
-      return outputRef(scope, e.source, e.sourceHandle);
+      exprs[o.key] = castTo(o.type, outputRef(scope, e.source, e.sourceHandle));
     } catch (err) {
       ok = false;
       if (!(err instanceof UpstreamError))
-        shared.diagnostics.push({ level: "error", message: `Particle Output: ${err instanceof Error ? err.message : String(err)}`, nodeId: out.id, graph: "particle" });
-      return null;
+        shared.diagnostics.push({ level: "error", message: `${label}: ${err instanceof Error ? err.message : String(err)}`, nodeId: out.id, graph: "function" });
     }
-  };
-  const colorExpr = port("color");
-  const opacityExpr = port("opacity");
-  if (ok && !colorExpr && !opacityExpr)
-    shared.diagnostics.push({ level: "warning", message: "Particle Output has nothing connected: particles keep their own look", nodeId: out.id, graph: "particle" });
-  // vec3(...) / float(...) so a scalar into Color, or a vec4 into Opacity, still has the right type
-  return { ...result, ok, colorExpr: colorExpr && `vec3(${colorExpr})`, opacityExpr: opacityExpr && `float(${opacityExpr})` };
+  }
+  if (ok && Object.values(exprs).every((e) => !e))
+    shared.diagnostics.push({ level: "warning", message: `${label} has nothing connected`, nodeId: out.id, graph: "function" });
+  return { ...result, ok, exprs };
 }
 
 // ---------------------------------------------------------------------------
@@ -1308,9 +1396,11 @@ function identifiers(code: string): Set<string> {
     .replace(/`(?:\\.|[^`\\])*`/g, '""')
     .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, '""');
   const out = new Set<string>();
+  // object keys ({ color: x }, { age: particleAge }) aren't references
+  const code2 = stripped.replace(/([{,]\s*)[A-Za-z_$][\w$]*\s*:(?!:)/g, "$1");
   const re = /(^|[^.\w$])([A-Za-z_$][\w$]*)/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(stripped))) out.add(m[2]);
+  while ((m = re.exec(code2))) out.add(m[2]);
   return out;
 }
 

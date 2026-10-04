@@ -250,11 +250,11 @@ export function createEditor(
         runtime: {
           material: "return { material: null, nodes: {}, uniforms: {} };",
           post: "return { outputNode: null, nodes: {}, uniforms: {} };",
-          particle: "return { color: null, opacity: null, nodes: {}, uniforms: {} };",
+          function: "return { nodes: {}, uniforms: {} };",
         },
         material: { lines: [], nodes: {}, uniforms: {}, ok: false },
         post: { lines: [], nodes: {}, uniforms: {}, ok: false, connected: false },
-        particle: { lines: [], nodes: {}, uniforms: {}, ok: false, color: false, opacity: false },
+        function: { lines: [], nodes: {}, uniforms: {}, ok: false, connected: {} },
         globals: {},
         diagnostics: [{ level: "error", message: `Compiler crashed: ${err instanceof Error ? err.message : err}` }],
         utils: [],

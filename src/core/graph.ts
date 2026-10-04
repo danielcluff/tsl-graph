@@ -1,4 +1,6 @@
 import { componentCount, getNodeDef, visibleSplitOutputs } from "./registry";
+import { autoLayout } from "./layout";
+import { allTargets, getTarget } from "./targets";
 import { migrateLegacyMultiOps, multiOpHandleId, multiOpInfo, multiOpInputs, multiOpParams, newMultiOpId } from "./multiop";
 import type {
   GlobalDef,
@@ -66,16 +68,23 @@ export function emptyGraph(): Graph {
   return { nodes: [], edges: [] };
 }
 
-export const GRAPH_KINDS: GraphKind[] = ["material", "post", "particle"];
+export const GRAPH_KINDS: GraphKind[] = ["material", "post", "function"];
 
-/** The top-level graphs a project edits: material + post, or the particle graph. */
-export function projectGraphs(doc: Pick<ProjectDoc, "kind">): GraphKind[] {
-  return doc.kind === "particle" ? ["particle"] : ["material", "post"];
+/** What a project makes: "function" when its target is a function target, else a material. */
+export function projectKind(doc: Pick<ProjectDoc, "target">): ProjectKind {
+  return getTarget(doc.target)?.base === "function" ? "function" : "material";
+}
+
+/** The top-level graphs a project edits: material + post, the material alone (material targets export no post), or the function graph. */
+export function projectGraphs(doc: Pick<ProjectDoc, "target">): GraphKind[] {
+  const t = getTarget(doc.target);
+  if (t?.base === "function") return ["function"];
+  return t ? ["material"] : ["material", "post"];
 }
 
 /** The graph a project opens on. */
-export function primaryGraph(doc: Pick<ProjectDoc, "kind">): GraphKind {
-  return doc.kind === "particle" ? "particle" : "material";
+export function primaryGraph(doc: Pick<ProjectDoc, "target">): GraphKind {
+  return projectKind(doc) === "function" ? "function" : "material";
 }
 
 /** Every graph body in the project: the top-level graphs and each subgraph. */
@@ -83,7 +92,13 @@ export function allGraphs(doc: ProjectDoc): Graph[] {
   return [...GRAPH_KINDS.map((k) => doc.graphs[k]).filter(Boolean), ...(doc.customNodes ?? []).map((s) => s.graph)];
 }
 
-export function createProject(name = "Untitled", kind: ProjectKind = "material"): ProjectDoc {
+/**
+ * A new project. `target` (see core/targets) picks the contract its module
+ * follows and its starting graph; none makes a plain material.
+ */
+export function createProject(name = "Untitled", target?: string): ProjectDoc {
+  const t = getTarget(target);
+  if (target !== undefined && !t) throw new Error(`Unknown target "${target}" (targets: ${allTargets().map((x) => x.id).join(", ")})`);
   const now = Date.now();
   const doc: ProjectDoc = {
     id: uid("p"),
@@ -91,31 +106,32 @@ export function createProject(name = "Untitled", kind: ProjectKind = "material")
     createdAt: now,
     updatedAt: now,
     version: 1,
-    ...(kind === "particle" ? { kind } : {}),
-    graphs: { material: emptyGraph(), post: emptyGraph(), particle: emptyGraph() },
+    ...(t ? { target: t.id } : {}),
+    graphs: { material: emptyGraph(), post: emptyGraph(), function: emptyGraph() },
     globals: [],
     customNodes: [],
     settings: defaultSettings(),
   };
-  if (kind === "particle") {
-    // the default look: the particle's colour, masked by its sprite shape
-    const color = addNode(doc, "particle", "particle/color", { x: 80, y: 120 });
-    const shape = addNode(doc, "particle", "particle/shape", { x: 80, y: 300 });
-    const rgb = addNode(doc, "particle", "math/mul", { x: 340, y: 140 });
-    const alpha = addNode(doc, "particle", "math/mul", { x: 340, y: 300 });
-    const out = addNode(doc, "particle", "particle/output", { x: 600, y: 200 });
-    connect(doc, "particle", { source: color.id, sourceHandle: "rgb", target: rgb.id, targetHandle: "a" });
-    connect(doc, "particle", { source: shape.id, sourceHandle: "rgb", target: rgb.id, targetHandle: "b" });
-    connect(doc, "particle", { source: color.id, sourceHandle: "w", target: alpha.id, targetHandle: "a" });
-    connect(doc, "particle", { source: shape.id, sourceHandle: "w", target: alpha.id, targetHandle: "b" });
-    connect(doc, "particle", { source: rgb.id, sourceHandle: "out", target: out.id, targetHandle: "color" });
-    connect(doc, "particle", { source: alpha.id, sourceHandle: "out", target: out.id, targetHandle: "opacity" });
-    return doc;
+  const main = primaryGraph(doc);
+  if (main === "material") {
+    addNode(doc, "material", "material/standard", { x: 400, y: 200 });
+    const pin = addNode(doc, "post", "post/input", { x: 80, y: 160 });
+    const pout = addNode(doc, "post", "post/output", { x: 460, y: 180 });
+    connect(doc, "post", { source: pin.id, sourceHandle: "color", target: pout.id, targetHandle: "color" });
   }
-  addNode(doc, "material", "material/standard", { x: 400, y: 200 });
-  const pin = addNode(doc, "post", "post/input", { x: 80, y: 160 });
-  const pout = addNode(doc, "post", "post/output", { x: 460, y: 180 });
-  connect(doc, "post", { source: pin.id, sourceHandle: "color", target: pout.id, targetHandle: "color" });
+  if (t?.starter) {
+    if (main === "material") doc.graphs.material = emptyGraph();
+    t.starter({
+      add: (type, x, y, values, activeInputs) => {
+        const node = addNode(doc, main, type, { x, y }, values ? { values } : undefined);
+        if (activeInputs) node.data.activeInputs = [...new Set([...(getNodeDef(type)?.defaultActiveInputs ?? []), ...activeInputs])];
+        return node.id;
+      },
+      connect: (source, sourceHandle, target, targetHandle) => void connect(doc, main, { source, sourceHandle, target, targetHandle }),
+    });
+    // starters place nodes roughly; previews make nodes tall, so lay them out properly
+    autoLayout(doc.graphs[main]);
+  }
   return doc;
 }
 
@@ -357,8 +373,15 @@ function multiOpResultType(operations: MultiOpOperation[], inTypes: Record<strin
 
 /** Bring documents saved by older versions up to date (in place). */
 export function normalizeDoc(doc: ProjectDoc): ProjectDoc {
-  // projects from before the particle graph kind
-  doc.graphs.particle ??= emptyGraph();
+  const legacy = doc as ProjectDoc & { kind?: string; graphs: { particle?: Graph } };
+  // particle shaders from before targets: kind "particle" with a "particle" graph
+  if (legacy.kind === "particle") doc.target ??= "particle";
+  delete legacy.kind;
+  if (legacy.graphs.particle) {
+    if (!doc.graphs.function?.nodes.length) doc.graphs.function = legacy.graphs.particle;
+    delete legacy.graphs.particle;
+  }
+  doc.graphs.function ??= emptyGraph();
   for (const g of allGraphs(doc)) migrateLegacyMultiOps(g);
   return doc;
 }
@@ -611,7 +634,7 @@ export function nodeCount(doc: ProjectDoc): number {
   return projectGraphs(doc).reduce((n, k) => n + (doc.graphs[k]?.nodes.length ?? 0), 0);
 }
 
-const NO_PREVIEW_KINDS = new Set(["comment", "group", "loop", "loopPart", "material", "postOutput", "particleOutput", "placeholder", "subgraphInput", "subgraphOutput"]);
+const NO_PREVIEW_KINDS = new Set(["comment", "group", "loop", "loopPart", "material", "postOutput", "targetOutput", "placeholder", "subgraphInput", "subgraphOutput"]);
 
 /** Whether nodes of this type produce a value that can be shown as a preview thumbnail. */
 export function hasPreview(type: string): boolean {

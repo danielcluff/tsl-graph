@@ -1,4 +1,5 @@
 import catalog from "./catalog.json";
+import { allTargets, onTargetsChanged, targetNodeDefs } from "./targets";
 import type { GraphKind, NodeDef, NodeKind, PortDef } from "./types";
 
 interface CatalogFile {
@@ -219,51 +220,6 @@ const materialNodes: NodeDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Particle graph (elate-particles sprite renderers)
-// ---------------------------------------------------------------------------
-
-// Inputs compile to free identifiers (particleAge, …) that whoever evaluates
-// the graph binds: the effect runtime to the sprite's attributes, the preview
-// to a cloud of test sprites, node thumbnails to a grid of sprites by age.
-const particleIn = (type: string, label: string, ident: string, out: string, description: string, extra: PortDef[] = []): NodeDef => ({
-  type,
-  label,
-  category: "Particle",
-  description,
-  tsl: ident,
-  pure: true,
-  graphs: ["particle"],
-  inputs: [],
-  outputs: [p("out", label, out), ...extra],
-});
-
-const particleNodes: NodeDef[] = [
-  particleIn("particle/age", "Particle Age", "particleAge", "float", "Normalised age: 0 at birth, 1 at death."),
-  particleIn("particle/life", "Particle Life", "particleLife", "float", "Lifetime in seconds."),
-  particleIn("particle/seed", "Particle Seed", "particleSeed", "float", "A random number in 0..1, fixed for the particle's life."),
-  particleIn("particle/velocity", "Particle Velocity", "particleVelocity", "vec3", "World velocity (units per second)."),
-  particleIn("particle/color", "Particle Color", "particleColor", "vec4", "The particle's colour × colour over life (linear RGBA).", [
-    p("rgb", "RGB", "vec3"),
-    p("w", "Alpha", "float"),
-  ]),
-  particleIn("particle/uv", "Sprite UV", "particleUv", "vec2", "UV across the sprite (after flipbook mapping)."),
-  particleIn("particle/shape", "Sprite Shape", "particleShape", "vec4", "The renderer's shape mask or texture sample (RGBA; rgb is white for procedural shapes).", [
-    p("rgb", "RGB", "vec3"),
-    p("w", "Alpha", "float"),
-  ]),
-  {
-    type: "particle/output",
-    label: "Particle Output",
-    category: "Particle",
-    description: "Colour and opacity of each particle. An unconnected input keeps the renderer's own (colour × shape).",
-    kind: "particleOutput",
-    graphs: ["particle"],
-    inputs: [p("color", "Color", "vec3", { connectionOnly: true }), p("opacity", "Opacity", "float", { connectionOnly: true })],
-    outputs: [],
-  },
-];
-
-// ---------------------------------------------------------------------------
 // Editor-only structural nodes
 // ---------------------------------------------------------------------------
 
@@ -384,15 +340,21 @@ function finalize(def: NodeDef): NodeDef {
   return { ...def, kind, graphs, inputs: def.inputs ?? [], outputs: def.outputs ?? [] };
 }
 
-const allDefs: NodeDef[] = [
-  ...(catalog as CatalogFile).categories.flatMap((c) => c.nodes),
-  ...materialNodes,
-  ...particleNodes,
-  ...structuralNodes,
-].map(finalize);
+const baseDefs: NodeDef[] = [...(catalog as CatalogFile).categories.flatMap((c) => c.nodes), ...materialNodes, ...structuralNodes].map(finalize);
+let allDefs: NodeDef[] = baseDefs;
 
 // The Post Input node exposes a few more outputs than the docs list mention.
 export const registry = new Map<string, NodeDef>(allDefs.map((d) => [d.type, d]));
+
+/** Target nodes (inputs, outputs) follow the registered targets. */
+function syncTargetNodes() {
+  for (const d of allDefs) if (d.targets) registry.delete(d.type);
+  const targetDefs = allTargets().flatMap(targetNodeDefs).map(finalize);
+  allDefs = [...baseDefs, ...targetDefs];
+  for (const d of targetDefs) registry.set(d.type, d);
+}
+syncTargetNodes();
+onTargetsChanged(syncTargetNodes);
 
 export function getNodeDef(type: string): NodeDef | undefined {
   return registry.get(type);
@@ -400,6 +362,11 @@ export function getNodeDef(type: string): NodeDef | undefined {
 
 export function allNodeDefs(): NodeDef[] {
   return allDefs;
+}
+
+/** Whether a node type can be used in a project of `target` (target nodes only in their own projects). */
+export function nodeAllowedFor(def: NodeDef, target: string | undefined): boolean {
+  return !def.targets || (target !== undefined && def.targets.includes(target));
 }
 
 /** Sidebar order matches the original editor. */
@@ -425,14 +392,18 @@ export const CATEGORY_ORDER = [
   "Utils",
 ];
 
-/** Categories shown in the node library for a given graph tab. */
-export function libraryCategories(graph: GraphKind): { name: string; nodes: NodeDef[] }[] {
+/** Categories shown in the node library for a given graph tab (and project target). */
+export function libraryCategories(graph: GraphKind, target?: string): { name: string; nodes: NodeDef[] }[] {
   const hidden = new Set(["Loop", "Subgraph", "Code"]);
-  return CATEGORY_ORDER.filter((c) => !hidden.has(c))
+  const targetCategories = allTargets()
+    .map((t) => t.category)
+    .filter((c) => !CATEGORY_ORDER.includes(c));
+  return [...CATEGORY_ORDER, ...new Set(targetCategories)]
+    .filter((c) => !hidden.has(c))
     .map((name) => ({
       name,
       nodes: allDefs
-        .filter((d) => d.category === name && (!d.graphs || d.graphs.includes(graph)))
+        .filter((d) => d.category === name && (!d.graphs || d.graphs.includes(graph)) && nodeAllowedFor(d, target))
         .filter((d) => d.type !== "utils/group" && d.type !== "utils/portal")
         .sort((a, b) => a.label.localeCompare(b.label)),
     }))

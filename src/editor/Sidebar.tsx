@@ -15,7 +15,7 @@ export function Sidebar() {
   const graphKind = (): GraphKind => ed.topGraph();
   const categories = createMemo(() => {
     const q = query().toLowerCase().trim();
-    const cats = libraryCategories(graphKind());
+    const cats = libraryCategories(graphKind(), ed.state.doc.target);
     if (!q) return cats;
     return cats
       .map((c) => ({

@@ -3,7 +3,7 @@
 import { For, Show, createSignal } from "solid-js";
 import { render } from "@solidjs/web";
 import { GraphEditor, type GraphHost, type ProviderId } from "../src/editor";
-import { PROVIDER_IDS, TEMPLATES, importTslGraph, isTslGraphExport, projectFromTemplate, type ProjectDoc, type ProjectSummary } from "../src";
+import { PROVIDER_IDS, TEMPLATES, getTarget, importTslGraph, isTslGraphExport, projectFromTemplate, type ProjectDoc, type ProjectSummary } from "../src";
 import "./styles.css";
 
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -114,7 +114,7 @@ function ProjectList() {
                     </a>
                     <div class="flex justify-between px-3 pb-2 text-xs text-muted-foreground">
                       <span>
-                        {p.nodeCount} nodes{p.kind === "particle" ? " · particle shader" : ""}
+                        {p.nodeCount} nodes{p.target ? ` · ${getTarget(p.target)?.label.toLowerCase() ?? p.target}` : ""}
                       </span>
                       <button
                         type="button"

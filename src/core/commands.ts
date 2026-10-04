@@ -25,7 +25,8 @@ import {
 } from "./graph";
 import { autoLayout } from "./layout";
 import { MULTI_OP_ORDER, multiOpInfo, newMultiOpId } from "./multiop";
-import { allNodeDefs, getNodeDef } from "./registry";
+import { allNodeDefs, getNodeDef, nodeAllowedFor } from "./registry";
+import { getTarget } from "./targets";
 import type { CodeNodeData, GlobalDef, GraphKind, GraphNode, GraphRef, PreviewSettings, ProjectDoc, XY } from "./types";
 
 export type Command =
@@ -105,13 +106,13 @@ function resolveRef(refs: Refs, id: string | undefined): string {
   return id;
 }
 
-/** The command's graph: given, or the project's main graph (material, or particle for particle shaders). */
+/** The command's graph: given, or the project's main graph (material, or function for function targets). */
 function g(doc: ProjectDoc, cmd: { graph?: GraphRef }): GraphRef {
   const graph = cmd.graph ?? primaryGraph(doc);
   if (graph.startsWith("sg:")) return graph;
   if (!projectGraphs(doc).includes(graph as GraphKind)) {
     if (!GRAPH_KINDS.includes(graph as GraphKind)) throw new CommandError(`Unknown graph "${graph}"`);
-    throw new CommandError(`This ${doc.kind === "particle" ? "particle shader" : "material"} project has no "${graph}" graph (graphs: ${projectGraphs(doc).join(", ")})`);
+    throw new CommandError(`This ${getTarget(doc.target)?.label.toLowerCase() ?? "material"} project has no "${graph}" graph (graphs: ${projectGraphs(doc).join(", ")})`);
   }
   return graph;
 }
@@ -145,6 +146,8 @@ export function executeCommand(doc: ProjectDoc, cmd: Command, refs: Refs = new M
         throw new CommandError("Placeholder nodes only come from imports and can't be added");
       if (def.graphs && !graph.startsWith("sg:") && !def.graphs.includes(graph as GraphKind))
         throw new CommandError(`"${cmd.type}" can only be used in the ${def.graphs.join("/")} graph`);
+      if (!nodeAllowedFor(def, doc.target))
+        throw new CommandError(`"${cmd.type}" belongs to the ${def.targets!.join("/")} target; this project's target is ${doc.target ?? "none"}`);
       if (def.kind === "loop") {
         // a loop comes with the parts for its mode
         const mode = String(cmd.values?.loopMode ?? "count") as LoopMode;
@@ -481,12 +484,13 @@ const NODE_NOTES: Record<string, string> = {
   comment: "Markdown text in `text`; width/height set the box size.",
 };
 
-export function listNodeTypes(filter: { category?: string; search?: string; graph?: GraphRef } = {}) {
+export function listNodeTypes(filter: { category?: string; search?: string; graph?: GraphRef; target?: string } = {}) {
   const q = filter.search?.toLowerCase().trim();
   return allNodeDefs()
     .filter((d) => d.category !== "Subgraph" && d.type !== "subgraph/instance" && d.kind !== "placeholder")
     .filter((d) => !filter.category || d.category.toLowerCase() === filter.category.toLowerCase())
     .filter((d) => !filter.graph || !d.graphs || filter.graph.startsWith("sg:") || d.graphs.includes(filter.graph as GraphKind))
+    .filter((d) => !d.targets || filter.target === undefined || d.targets.includes(filter.target))
     .filter(
       (d) =>
         !q ||

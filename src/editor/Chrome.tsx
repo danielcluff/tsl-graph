@@ -34,6 +34,7 @@ import {
   Split,
 } from "lucide-static";
 import { getNodeDef } from "../core/registry";
+import { getTarget } from "../core/targets";
 import { Icon, MenuItem, MenuLabel, MenuSeparator, Popover, ThemedPortal, Tooltip, togglePopover, type PopoverAnchor } from "../ui";
 import { CanvasMenu } from "./CanvasMenu";
 import { HostContext, graphMcpUrl } from "./host";
@@ -104,13 +105,13 @@ export function TopBar(props: { embed?: boolean; onSaveJson: () => void; onLoadJ
           }}
         />
         <Show
-          when={ed.state.doc.kind !== "particle"}
+          when={!ed.state.doc.target}
           fallback={
             <span
               class="flex h-[30px] shrink-0 items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 text-[11px] font-medium text-amber-300"
-              title="A particle shader: the look of each particle of an elate-particles sprite renderer"
+              title={getTarget(ed.state.doc.target)?.description ?? `Unknown target "${ed.state.doc.target}"`}
             >
-              <Icon svg={Sparkles} class="size-3" /> Particle shader
+              <Icon svg={Sparkles} class="size-3" /> {getTarget(ed.state.doc.target)?.label ?? ed.state.doc.target}
             </span>
           }
         >

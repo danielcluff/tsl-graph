@@ -1,5 +1,5 @@
 import { canConnectTypes, makeNode, resolvePorts } from "../core/graph";
-import { allNodeDefs } from "../core/registry";
+import { allNodeDefs, nodeAllowedFor } from "../core/registry";
 import type { GraphKind, NodeDef, PortDef, ProjectDoc } from "../core/types";
 import type { Editor } from "./store";
 
@@ -28,7 +28,8 @@ export function addableNodeDefs(ed: Editor, from?: PendingWire): NodeDef[] {
       d.kind !== "placeholder" &&
       d.category !== "Loop" &&
       d.type !== "utils/group" &&
-      (!d.graphs || graph.startsWith("sg:") || d.graphs.includes(kind)),
+      (!d.graphs || graph.startsWith("sg:") || d.graphs.includes(kind)) &&
+      nodeAllowedFor(d, ed.state.doc.target),
   );
   if (from) defs = defs.filter((d) => compatiblePort(d, from, ed.state.doc));
   return defs;

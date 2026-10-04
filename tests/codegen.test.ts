@@ -31,7 +31,8 @@ describe("codegen", () => {
   it("every catalog node compiles standalone without codegen errors", () => {
     const skip = new Set(["loop", "loopPart", "localGet", "localSet", "globalRef", "subgraph", "subgraphInput", "portal", "assign", "placeholder"]);
     for (const def of allNodeDefs()) {
-      if (skip.has(def.kind ?? "")) continue;
+      // target nodes are covered by tests/particle.test.ts and tests/targets.test.ts
+      if (skip.has(def.kind ?? "") || def.targets) continue;
       const doc = createProject("t");
       const graph = def.graphs?.includes("material") === false ? "post" : "material";
       addNode(doc, graph, def.type, { x: 0, y: 0 });

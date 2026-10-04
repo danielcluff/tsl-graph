@@ -16,7 +16,7 @@ import { McpActivity } from "./mcp-activity";
 import { createTools, type ToolSpec } from "./tools";
 
 export type { McpMode, ProjectStore, ProviderId } from "../host";
-export { INSTRUCTIONS, runTool, type ToolResult, type ToolSpec } from "./tools";
+export { INSTRUCTIONS, instructions, runTool, targetsDoc, type ToolResult, type ToolSpec } from "./tools";
 export { registerGraphTools, graphInstructions } from "./mcp";
 export { envApiKey, type ApiKeyResolver } from "./ai/index";
 

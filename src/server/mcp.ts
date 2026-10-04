@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { INSTRUCTIONS, runTool, type ToolSpec } from "./tools";
+import { instructions, runTool, type ToolSpec } from "./tools";
 
 export interface RegisterOptions {
   /** Prepended to every tool name (e.g. "shader_"), for parent servers that host tools from several sections. */
@@ -21,7 +21,7 @@ export function prefixToolNames(text: string, tools: ToolSpec[], prefix = ""): s
 
 /** MCP server instructions for the graph tools (with the same prefix as the tools). */
 export function graphInstructions(tools: ToolSpec[], prefix = ""): string {
-  return prefixToolNames(INSTRUCTIONS, tools, prefix);
+  return prefixToolNames(instructions(), tools, prefix);
 }
 
 /** Register the graph tools on an MCP server, which may be the parent application's own. */
@@ -41,7 +41,7 @@ export function registerGraphTools(server: McpServer, tools: ToolSpec[], opts: R
 
 /** A standalone MCP server with only the graph tools (the built-in /mcp endpoint). */
 export function createMcpServer(tools: ToolSpec[]): McpServer {
-  const server = new McpServer({ name: "tsl-graph", version: "0.1.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "tsl-graph", version: "0.1.0" }, { instructions: instructions() });
   registerGraphTools(server, tools);
   return server;
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { describeNodeType, executeCommand, isReadOnly, listNodeTypes, type Command } from "../core/commands";
 import { compileProject } from "../core/codegen";
 import { CATEGORY_ORDER } from "../core/registry";
+import { allTargets, targetInputType, targetOutputType } from "../core/targets";
 import type { ProjectStore } from "../host";
 import type { Bridge } from "./bridge";
 
@@ -10,7 +11,7 @@ export const INSTRUCTIONS = `TSL Graph is a node-based editor for Three.js TSL (
 
 A material project has two graphs: "material" (must contain one material node such as material/standard; its inputs like colorNode/positionNode receive the shader) and "post" (post-processing; post/input provides the rendered scene, post/output receives the final color).
 
-A particle shader project (kind "particle", for elate-particles sprite renderers) has one graph, "particle": particle/* input nodes give per-particle values (particle/age 0..1 over life, particle/seed, particle/life, particle/velocity, particle/color = base colour × colour over life as RGBA, particle/uv = sprite UV, particle/shape = the sprite's mask or texture as RGBA) and particle/output takes color (vec3) and opacity (float). An unconnected output keeps the renderer's own colour × shape. Omit "graph" to use the project's main graph.
+A project can have a target: the contract its exported module follows (see the targets below). A function target has one graph, "function": its input nodes (<target>/<input>) give the values the consumer passes in, and <target>/output takes what the function returns (an unconnected output returns null). A material target edits the "material" graph only and exports a factory (options) => material; its input nodes read the factory's options. Omit "graph" to use the project's main graph.
 
 Workflow:
 1. list_projects / create_project, or omit projectId to use the project currently open in the browser editor.
@@ -19,6 +20,22 @@ Workflow:
 4. compile_graph returns the generated TSL code and diagnostics. validate_graph (needs the editor open) also reports runtime/shader errors. capture_preview returns a screenshot of the live 3D preview.
 
 Tips: ports are identified by key (see get_node_type). Unconnected inputs use their inline values (set via update_node values). Material nodes only compile inputs listed in activeInputs; connecting an input activates it automatically. Output handles "x","y","z","w" (or "r","g","b") are swizzles of "out". Call auto_layout after building a graph so it is readable for the user.`;
+
+/** The registered targets, for tool docs (hosts register theirs before creating the server). */
+export function targetsDoc(): string {
+  return allTargets()
+    .map((t) => {
+      const inputs = t.inputs.map((i) => `${targetInputType(t, i.key)} (${i.type}${t.base === "material" ? `, default ${JSON.stringify(i.default)}` : ""}): ${i.description}`).join("; ");
+      const outputs = t.base === "function" ? ` ${targetOutputType(t)} takes ${t.outputs!.map((o) => `${o.key} (${o.type}): ${o.description}`).join("; ")}.` : "";
+      return `- target "${t.id}" (${t.base}): ${t.label}. ${t.description} Inputs: ${inputs}.${outputs}`;
+    })
+    .join("\n");
+}
+
+/** Usage notes for the tools, including the targets registered now. */
+export function instructions(): string {
+  return `${INSTRUCTIONS}\n\nTargets:\n${targetsDoc()}`;
+}
 
 export type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 export interface ToolResult {
@@ -36,7 +53,7 @@ export interface ToolSpec {
   run: (args: Record<string, unknown>) => Promise<ToolResult>;
 }
 
-const graphSchema = z.enum(["material", "post", "particle"]).optional().describe('Which graph (default: the project\'s main graph, "material" or "particle")');
+const graphSchema = z.enum(["material", "post", "function"]).optional().describe('Which graph (default: the project\'s main graph, "material" or "function")');
 const projectIdSchema = z
   .string()
   .optional()
@@ -121,6 +138,7 @@ export function createTools(ctx: ToolContext): ToolSpec[] {
             id: p.id,
             name: p.name,
             kind: p.kind ?? "material",
+            ...(p.target ? { target: p.target } : {}),
             nodeCount: p.nodeCount,
             updatedAt: new Date(p.updatedAt).toISOString(),
             openInEditor: open.has(p.id),
@@ -131,12 +149,13 @@ export function createTools(ctx: ToolContext): ToolSpec[] {
     },
     {
       name: "create_project",
-      description:
-        'Create a new project. kind "material" (default): the material graph starts with a MeshStandardMaterial, the post graph with Post Input → Post Output. kind "particle": a particle shader for elate-particles, starting as colour × shape into Particle Output. Set open=true to navigate a connected editor tab to it.',
-      shape: { name: z.string().optional(), kind: z.enum(["material", "particle"]).optional(), open: z.boolean().optional() },
+      description: `Create a new project. Without a target: a plain material (MeshStandardMaterial; post graph Post Input → Post Output). With a target, the project follows that target's contract and starts from its starter graph (targets: ${allTargets()
+        .map((t) => `"${t.id}" ${t.label}`)
+        .join(", ")}). Set open=true to navigate a connected editor tab to it.`,
+      shape: { name: z.string().optional(), target: z.string().optional().describe("Target id (see the targets in the instructions)"), open: z.boolean().optional() },
       projectManagement: true,
       run: async (a) => {
-        const doc = await store.create(a.name as string | undefined, a.kind === "particle" ? { kind: "particle" } : undefined);
+        const doc = await store.create(a.name as string | undefined, a.target ? { target: a.target as string } : undefined);
         const opened = a.open ? navigateEditor(doc.id) : false;
         return ok({ projectId: doc.id, name: doc.name, ...url(doc.id), openedInEditor: opened });
       },
@@ -168,9 +187,9 @@ export function createTools(ctx: ToolContext): ToolSpec[] {
     {
       name: "list_node_types",
       description: `List available node types. Filter by category (${CATEGORY_ORDER.join(", ")}, Loop) or free-text search.`,
-      shape: { category: z.string().optional(), search: z.string().optional(), graph: graphSchema },
+      shape: { category: z.string().optional(), search: z.string().optional(), graph: graphSchema, target: z.string().optional().describe("Only nodes usable in a project of this target") },
       run: async (a) => {
-        const list = listNodeTypes(a as { category?: string; search?: string; graph?: "material" | "post" | "particle" });
+        const list = listNodeTypes(a as { category?: string; search?: string; graph?: "material" | "post" | "function"; target?: string });
         return ok(list.length ? list : "No matching node types.");
       },
     },

@@ -1,6 +1,6 @@
 /// <reference path="../types.d.ts" />
-// Particle shaders: evaluating a particle graph (ProjectDoc.kind "particle")
-// with its inputs bound to real nodes.
+// Particle shaders: the built-in "particle" target (core/targets) at runtime,
+// a particle graph evaluated with its inputs bound to real nodes.
 //
 //  - createParticleShader(doc) gives the function elate-particles calls for a
 //    sprite renderer with `material: { kind: "graph", shaderId }` (pass it via
@@ -28,10 +28,9 @@ import {
   vec3,
   vec4,
 } from "three/tsl";
-import { compileProject, PARTICLE_INPUTS } from "../core/codegen";
-import { normalizeDoc } from "../core/graph";
+import { PARTICLE_TARGET } from "../core/targets";
 import type { Diagnostic, ProjectDoc } from "../core/types";
-import { runtimeScope } from "./scope";
+import { createTargetFunction, evaluateTarget, registerTargetPreview } from "./targets";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Node = any;
@@ -65,11 +64,10 @@ export interface ParticleGraphResult extends ParticleOutputs {
   uniforms: Record<string, { value: unknown }>;
 }
 
-/** Evaluate a compiled particle body (CompileResult.runtime.particle) with `inputs` bound. */
+/** Evaluate a compiled particle body (CompileResult.runtime.function) with `inputs` bound. */
 export function evaluateParticle(body: string, inputs: ParticleInputs): ParticleGraphResult {
-  const { keys, values } = runtimeScope();
-  const fn = new Function(...keys, ...PARTICLE_INPUTS.map((i) => i.ident), body);
-  return fn(...values, ...PARTICLE_INPUTS.map((i) => inputs[i.key]));
+  const r = evaluateTarget(PARTICLE_TARGET, body, inputs as unknown as Record<string, Node>);
+  return { color: r.outputs.color ?? null, opacity: r.outputs.opacity ?? null, nodes: r.nodes, uniforms: r.uniforms };
 }
 
 export interface ParticleShader {
@@ -87,20 +85,11 @@ export function createParticleShader(
   doc: ProjectDoc,
   onError?: (message: string) => void,
 ): { shader: ParticleShader; diagnostics: Diagnostic[]; ok: boolean } {
-  const compiled = compileProject(normalizeDoc(structuredClone(doc)));
-  const ok = compiled.particle.ok && !compiled.diagnostics.some((d) => d.level === "error");
-  const body = compiled.runtime.particle;
-  const shader: ParticleShader = (inputs) => {
-    if (!ok) return {};
-    try {
-      const r = evaluateParticle(body, inputs);
-      return { color: r.color, opacity: r.opacity };
-    } catch (err) {
-      onError?.(`${doc.name}: ${err instanceof Error ? err.message : String(err)}`);
-      return {};
-    }
-  };
-  return { shader, diagnostics: compiled.diagnostics, ok };
+  const { fn, diagnostics, ok, target } = createTargetFunction(doc, onError);
+  if (target && target.id !== PARTICLE_TARGET.id) diagnostics.push({ level: "error", message: `"${doc.name}" is a ${target.label.toLowerCase()}, not a particle shader` });
+  const usable = ok && target?.id === PARTICLE_TARGET.id;
+  const shader: ParticleShader = (inputs) => (usable ? fn(inputs as unknown as Record<string, Node>) : {});
+  return { shader, diagnostics, ok: usable };
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +146,10 @@ export function createParticleCloud(count = 320): THREE.InstancedMesh {
 
 /** Rebuilds the cloud's material for a compiled particle body. Returns the graph's uniforms (for live edits). */
 export function applyParticleCloud(mesh: THREE.InstancedMesh, body: string): ParticleGraphResult["uniforms"] {
+  return applyCloud(mesh, (inputs) => evaluateParticle(body, inputs));
+}
+
+function applyCloud(mesh: THREE.InstancedMesh, evaluate: (inputs: ParticleInputs) => ParticleGraphResult): ParticleGraphResult["uniforms"] {
   const i = float(instanceIndex);
   const seed = hash(i);
   const life = mix(1.1, 2.2, hash(i.add(17)));
@@ -183,7 +176,7 @@ export function applyParticleCloud(mesh: THREE.InstancedMesh, body: string): Par
     uv: uv(),
     shape,
   };
-  const r = evaluateParticle(body, inputs);
+  const r = evaluate(inputs);
   material.colorNode = r.color ?? color.xyz.mul(shape.xyz);
   material.opacityNode = clamp(r.opacity ?? color.w.mul(shape.w), 0, 1);
   const old = mesh.material as THREE.Material;
@@ -191,3 +184,17 @@ export function applyParticleCloud(mesh: THREE.InstancedMesh, body: string): Par
   old.dispose();
   return r.uniforms;
 }
+
+// The editor previews particle shaders on a fountain of test sprites.
+registerTargetPreview(PARTICLE_TARGET.id, {
+  animated: true,
+  thumbnailInputs: () => particleThumbnailInputs() as unknown as Record<string, Node>,
+  apply(evaluate, previous) {
+    const cloud = (previous as THREE.InstancedMesh | undefined) ?? createParticleCloud();
+    const uniforms = applyCloud(cloud, (inputs) => {
+      const r = evaluate(inputs as unknown as Record<string, Node>);
+      return { color: r.outputs.color ?? null, opacity: r.outputs.opacity ?? null, nodes: r.nodes, uniforms: r.uniforms };
+    });
+    return { object: cloud, uniforms };
+  },
+});
