@@ -103,6 +103,17 @@ export function TopBar(props: { embed?: boolean; onSaveJson: () => void; onLoadJ
             if (v !== ed.state.doc.name) ed.mutate((d) => void (d.name = v), { history: false, recompile: false });
           }}
         />
+        <Show
+          when={ed.state.doc.kind !== "particle"}
+          fallback={
+            <span
+              class="flex h-[30px] shrink-0 items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 text-[11px] font-medium text-amber-300"
+              title="A particle shader: the look of each particle of an elate-particles sprite renderer"
+            >
+              <Icon svg={Sparkles} class="size-3" /> Particle shader
+            </span>
+          }
+        >
         <div class="flex h-[30px] shrink-0 items-center rounded-md border p-0.5 text-[11px]">
           <For each={["material", "post"] as const}>
             {(g) => (
@@ -119,6 +130,7 @@ export function TopBar(props: { embed?: boolean; onSaveJson: () => void; onLoadJ
             )}
           </For>
         </div>
+        </Show>
       </Show>
       <div class="flex-1" />
       <SaveBadge />

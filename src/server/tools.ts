@@ -8,7 +8,9 @@ import type { Bridge } from "./bridge";
 
 export const INSTRUCTIONS = `TSL Graph is a node-based editor for Three.js TSL (WebGPU) shaders.
 
-A project has two graphs: "material" (must contain one material node such as material/standard; its inputs like colorNode/positionNode receive the shader) and "post" (post-processing; post/input provides the rendered scene, post/output receives the final color).
+A material project has two graphs: "material" (must contain one material node such as material/standard; its inputs like colorNode/positionNode receive the shader) and "post" (post-processing; post/input provides the rendered scene, post/output receives the final color).
+
+A particle shader project (kind "particle", for elate-particles sprite renderers) has one graph, "particle": particle/* input nodes give per-particle values (particle/age 0..1 over life, particle/seed, particle/life, particle/velocity, particle/color = base colour × colour over life as RGBA, particle/uv = sprite UV, particle/shape = the sprite's mask or texture as RGBA) and particle/output takes color (vec3) and opacity (float). An unconnected output keeps the renderer's own colour × shape. Omit "graph" to use the project's main graph.
 
 Workflow:
 1. list_projects / create_project, or omit projectId to use the project currently open in the browser editor.
@@ -34,7 +36,7 @@ export interface ToolSpec {
   run: (args: Record<string, unknown>) => Promise<ToolResult>;
 }
 
-const graphSchema = z.enum(["material", "post"]).optional().describe('Which graph (default "material")');
+const graphSchema = z.enum(["material", "post", "particle"]).optional().describe('Which graph (default: the project\'s main graph, "material" or "particle")');
 const projectIdSchema = z
   .string()
   .optional()
@@ -118,6 +120,7 @@ export function createTools(ctx: ToolContext): ToolSpec[] {
           projects.map((p) => ({
             id: p.id,
             name: p.name,
+            kind: p.kind ?? "material",
             nodeCount: p.nodeCount,
             updatedAt: new Date(p.updatedAt).toISOString(),
             openInEditor: open.has(p.id),
@@ -129,11 +132,11 @@ export function createTools(ctx: ToolContext): ToolSpec[] {
     {
       name: "create_project",
       description:
-        "Create a new project (material graph starts with a MeshStandardMaterial, post graph with Post Input → Post Output). Set open=true to navigate a connected editor tab to it.",
-      shape: { name: z.string().optional(), open: z.boolean().optional() },
+        'Create a new project. kind "material" (default): the material graph starts with a MeshStandardMaterial, the post graph with Post Input → Post Output. kind "particle": a particle shader for elate-particles, starting as colour × shape into Particle Output. Set open=true to navigate a connected editor tab to it.',
+      shape: { name: z.string().optional(), kind: z.enum(["material", "particle"]).optional(), open: z.boolean().optional() },
       projectManagement: true,
       run: async (a) => {
-        const doc = await store.create(a.name as string | undefined);
+        const doc = await store.create(a.name as string | undefined, a.kind === "particle" ? { kind: "particle" } : undefined);
         const opened = a.open ? navigateEditor(doc.id) : false;
         return ok({ projectId: doc.id, name: doc.name, ...url(doc.id), openedInEditor: opened });
       },
@@ -167,7 +170,7 @@ export function createTools(ctx: ToolContext): ToolSpec[] {
       description: `List available node types. Filter by category (${CATEGORY_ORDER.join(", ")}, Loop) or free-text search.`,
       shape: { category: z.string().optional(), search: z.string().optional(), graph: graphSchema },
       run: async (a) => {
-        const list = listNodeTypes(a as { category?: string; search?: string; graph?: "material" | "post" });
+        const list = listNodeTypes(a as { category?: string; search?: string; graph?: "material" | "post" | "particle" });
         return ok(list.length ? list : "No matching node types.");
       },
     },

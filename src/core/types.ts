@@ -70,6 +70,8 @@ export type NodeKind =
   | "postInput"
   | "postOutput"
   | "postScene"
+  /** The particle graph's output (colour / opacity of each particle). */
+  | "particleOutput"
   | "textureSample"
   | "gradient"
   | "portal"
@@ -97,7 +99,14 @@ export interface NodeDef {
   keywords?: string[];
 }
 
-export type GraphKind = "material" | "post";
+/**
+ * material: a mesh material (with "post" for post-processing).
+ * particle: the look of each particle of an elate-particles sprite renderer;
+ * inputs are per-particle values (age, seed, colour, sprite UV…).
+ */
+export type GraphKind = "material" | "post" | "particle";
+/** What a project makes: a material (material + post graphs) or a particle shader (particle graph). */
+export type ProjectKind = "material" | "particle";
 /** A graph address: a top-level graph or a subgraph body (`sg:<subgraphId>`). */
 export type GraphRef = GraphKind | `sg:${string}`;
 
@@ -263,6 +272,8 @@ export interface ProjectDoc {
   createdAt: number;
   updatedAt: number;
   version: 1;
+  /** Default "material". */
+  kind?: ProjectKind;
   thumbnail?: string;
   graphs: Record<GraphKind, Graph>;
   globals: GlobalDef[];
@@ -273,6 +284,7 @@ export interface ProjectDoc {
 export interface ProjectSummary {
   id: string;
   name: string;
+  kind?: ProjectKind;
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;

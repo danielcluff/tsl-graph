@@ -20,8 +20,28 @@ tools. It is meant to be embedded in a parent application, which owns projects a
 | `tsl-graph/editor`     | browser  | `<GraphEditor>` (Solid), `mountGraphEditor(el, props)` (any framework), `NodeCard` |
 | `tsl-graph/ui`         | browser  | The UI kit the editor uses (Button, Dialog, Popover, …) and `setTheme`             |
 | `tsl-graph/server`     | Node     | `createGraphServer()` (MCP + bridge + AI chat), `createFileStore()`                |
+| `tsl-graph/particle`   | browser  | `createParticleShader(project)`: a particle shader as elate-particles calls it      |
 | `tsl-graph/styles.css` | browser  | Complete editor styles, Tailwind included                                          |
 | `tsl-graph/editor.css` | browser  | Editor styles for hosts with their own Tailwind v4 build (see Styles)              |
+
+## Particle shaders
+
+A project is a **material** (material + post graphs, the default) or a **particle shader** (`kind: "particle"`, one
+`particle` graph): the look of each particle of an [elate-particles](https://github.com/danielcluff/elate-particles)
+sprite renderer.
+
+- **Inputs** (category *Particle*): Particle Age (0..1 over life), Particle Life, Particle Seed, Particle Velocity,
+  Particle Color (base colour × colour over life, RGBA), Sprite UV and Sprite Shape (the renderer's mask or texture,
+  RGBA). **Particle Output** takes Color (vec3) and Opacity (float); an unconnected one keeps the renderer's own colour ×
+  shape.
+- **Compiling:** the inputs compile to free identifiers (`particleAge`, …, see `PARTICLE_INPUTS`), so one body serves
+  everywhere. The exported module is `export function particleShader({ age, seed, … }) { …; return { color, opacity } }`.
+- **At runtime:** `createParticleShader(doc)` (from `tsl-graph/particle`) returns the function to give
+  `new ParticleWorld({ shaders: (id) => … })`; a sprite renderer with `material: { kind: "graph", shaderId }` uses it.
+  After an edit, rebuild it and call `world.invalidateShader(id)`.
+- **Preview:** the main view shows a fountain of test sprites; node thumbnails show a 3×3 grid of sprites whose age runs
+  from 0 (top left) to 1 (bottom right), so each node shows how its value changes over a particle's life.
+- Create one from the *Particle Shader* / *Particle: Hot Core* templates, or `create_project` with `kind: "particle"`.
 
 ## Embedding
 
@@ -206,7 +226,7 @@ uses `tsl-graph/ui` for its own pages, call `setTheme("dark" | "light")` so its 
 
 ```
 src/core/      framework-free graph model, node registry, commands, TSL compiler, layout, templates, importers
-src/runtime/   TSL evaluation scope + WebGPU preview renderer
+src/runtime/   TSL evaluation scope + WebGPU preview renderer, particle shader evaluation (particle.ts)
 src/editor/    Solid editor UI (GraphEditor, panels, AI chat client, bridge client)
 src/ui/        UI kit + theme
 src/server/    graph server: MCP, bridge, tool table (tools.ts, shared by MCP and chat), ai/ provider adapters

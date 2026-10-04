@@ -36,7 +36,7 @@ export function createFileStore(dir: string): FileStore {
       for (const f of (await readdir(root)).filter((f) => f.endsWith(".json"))) {
         try {
           const doc = JSON.parse(await readFile(join(root, f), "utf8")) as ProjectDoc;
-          out.push({ id: doc.id, name: doc.name, createdAt: doc.createdAt, updatedAt: doc.updatedAt, thumbnail: doc.thumbnail, nodeCount: nodeCount(doc) });
+          out.push({ id: doc.id, name: doc.name, kind: doc.kind ?? "material", createdAt: doc.createdAt, updatedAt: doc.updatedAt, thumbnail: doc.thumbnail, nodeCount: nodeCount(doc) });
         } catch {
           // skip unreadable files
         }
@@ -52,9 +52,9 @@ export function createFileStore(dir: string): FileStore {
     },
     save,
     async create(name, from) {
-      const doc = createProject(name || "Untitled");
+      const doc = createProject(name || "Untitled", from?.kind === "particle" ? "particle" : "material");
       if (from) {
-        if (from.graphs) doc.graphs = from.graphs;
+        if (from.graphs) doc.graphs = { ...doc.graphs, ...from.graphs };
         if (from.globals) doc.globals = from.globals;
         if (from.customNodes) doc.customNodes = from.customNodes;
         if (from.settings) doc.settings = { ...doc.settings, ...from.settings };

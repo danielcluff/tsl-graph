@@ -1,11 +1,13 @@
 import { executeCommand, type Command } from "./commands";
 import { createProject } from "./graph";
-import type { ProjectDoc } from "./types";
+import type { ProjectDoc, ProjectKind } from "./types";
 
 export interface Template {
   id: string;
   name: string;
   description: string;
+  /** Default "material". */
+  kind?: ProjectKind;
   build: (doc: ProjectDoc) => void;
 }
 
@@ -124,11 +126,56 @@ export const TEMPLATES: Template[] = [
       ]);
     },
   },
+  {
+    id: "particle",
+    name: "Particle Shader",
+    kind: "particle",
+    description: "The look of each particle of an elate-particles sprite renderer: colour × shape, ready to change.",
+    build: () => {},
+  },
+  {
+    id: "particle-hot-core",
+    name: "Particle: Hot Core",
+    kind: "particle",
+    description: "Particles flash white-hot (HDR) at birth, cool to their own colour and fade out with age.",
+    build: (doc) => {
+      const g = doc.graphs.particle;
+      const out = g.nodes.find((n) => n.type === "particle/output")!.id;
+      const color = g.nodes.find((n) => n.type === "particle/color")!.id;
+      const shape = g.nodes.find((n) => n.type === "particle/shape")!.id;
+      // the starter's colour × shape multiplies are replaced
+      run(doc, [
+        { op: "deleteNodes", graph: "particle", nodeIds: g.nodes.filter((n) => n.type === "math/mul").map((n) => n.id) },
+        { op: "addNode", graph: "particle", type: "particle/age", ref: "age" },
+        // heat: 1 at birth, 0 by a third of the life
+        { op: "addNode", graph: "particle", type: "math/smoothstep", ref: "cool", values: { edge0: 0.35, edge1: 0 } },
+        { op: "connect", graph: "particle", source: "$age", target: "$cool", targetHandle: "x" },
+        { op: "addNode", graph: "particle", type: "math/mix", ref: "tint", values: { b: [4, 3.2, 2.4] } },
+        { op: "connect", graph: "particle", source: color, sourceHandle: "rgb", target: "$tint", targetHandle: "a" },
+        { op: "connect", graph: "particle", source: "$cool", target: "$tint", targetHandle: "t" },
+        { op: "addNode", graph: "particle", type: "math/mul", ref: "rgb" },
+        { op: "connect", graph: "particle", source: "$tint", target: "$rgb", targetHandle: "a" },
+        { op: "connect", graph: "particle", source: shape, sourceHandle: "rgb", target: "$rgb", targetHandle: "b" },
+        { op: "connect", graph: "particle", source: "$rgb", target: out, targetHandle: "color" },
+        // fade: shape alpha × colour alpha × (1 - age)
+        { op: "addNode", graph: "particle", type: "math/oneMinus", ref: "life" },
+        { op: "connect", graph: "particle", source: "$age", target: "$life", targetHandle: "x" },
+        { op: "addNode", graph: "particle", type: "math/mul", ref: "a1" },
+        { op: "connect", graph: "particle", source: shape, sourceHandle: "w", target: "$a1", targetHandle: "a" },
+        { op: "connect", graph: "particle", source: color, sourceHandle: "w", target: "$a1", targetHandle: "b" },
+        { op: "addNode", graph: "particle", type: "math/mul", ref: "alpha" },
+        { op: "connect", graph: "particle", source: "$a1", target: "$alpha", targetHandle: "a" },
+        { op: "connect", graph: "particle", source: "$life", target: "$alpha", targetHandle: "b" },
+        { op: "connect", graph: "particle", source: "$alpha", target: out, targetHandle: "opacity" },
+        { op: "autoLayout", graph: "particle" },
+      ]);
+    },
+  },
 ];
 
 export function projectFromTemplate(templateId: string, name?: string): ProjectDoc {
   const t = TEMPLATES.find((x) => x.id === templateId) ?? TEMPLATES[0];
-  const doc = createProject(name ?? (t.id === "blank" ? "Untitled" : t.name));
+  const doc = createProject(name ?? (t.id === "blank" ? "Untitled" : t.name), t.kind);
   t.build(doc);
   return doc;
 }

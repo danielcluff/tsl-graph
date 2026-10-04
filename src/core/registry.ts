@@ -219,6 +219,51 @@ const materialNodes: NodeDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Particle graph (elate-particles sprite renderers)
+// ---------------------------------------------------------------------------
+
+// Inputs compile to free identifiers (particleAge, …) that whoever evaluates
+// the graph binds: the effect runtime to the sprite's attributes, the preview
+// to a cloud of test sprites, node thumbnails to a grid of sprites by age.
+const particleIn = (type: string, label: string, ident: string, out: string, description: string, extra: PortDef[] = []): NodeDef => ({
+  type,
+  label,
+  category: "Particle",
+  description,
+  tsl: ident,
+  pure: true,
+  graphs: ["particle"],
+  inputs: [],
+  outputs: [p("out", label, out), ...extra],
+});
+
+const particleNodes: NodeDef[] = [
+  particleIn("particle/age", "Particle Age", "particleAge", "float", "Normalised age: 0 at birth, 1 at death."),
+  particleIn("particle/life", "Particle Life", "particleLife", "float", "Lifetime in seconds."),
+  particleIn("particle/seed", "Particle Seed", "particleSeed", "float", "A random number in 0..1, fixed for the particle's life."),
+  particleIn("particle/velocity", "Particle Velocity", "particleVelocity", "vec3", "World velocity (units per second)."),
+  particleIn("particle/color", "Particle Color", "particleColor", "vec4", "The particle's colour × colour over life (linear RGBA).", [
+    p("rgb", "RGB", "vec3"),
+    p("w", "Alpha", "float"),
+  ]),
+  particleIn("particle/uv", "Sprite UV", "particleUv", "vec2", "UV across the sprite (after flipbook mapping)."),
+  particleIn("particle/shape", "Sprite Shape", "particleShape", "vec4", "The renderer's shape mask or texture sample (RGBA; rgb is white for procedural shapes).", [
+    p("rgb", "RGB", "vec3"),
+    p("w", "Alpha", "float"),
+  ]),
+  {
+    type: "particle/output",
+    label: "Particle Output",
+    category: "Particle",
+    description: "Colour and opacity of each particle. An unconnected input keeps the renderer's own (colour × shape).",
+    kind: "particleOutput",
+    graphs: ["particle"],
+    inputs: [p("color", "Color", "vec3", { connectionOnly: true }), p("opacity", "Opacity", "float", { connectionOnly: true })],
+    outputs: [],
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Editor-only structural nodes
 // ---------------------------------------------------------------------------
 
@@ -342,6 +387,7 @@ function finalize(def: NodeDef): NodeDef {
 const allDefs: NodeDef[] = [
   ...(catalog as CatalogFile).categories.flatMap((c) => c.nodes),
   ...materialNodes,
+  ...particleNodes,
   ...structuralNodes,
 ].map(finalize);
 
@@ -370,6 +416,7 @@ export const CATEGORY_ORDER = [
   "Model",
   "Noise",
   "Notes",
+  "Particle",
   "Post",
   "Post FX",
   "SDF",
@@ -400,6 +447,7 @@ export const CATEGORY_HEADER: Record<string, string> = {
   Subgraph: "cat-subgraph",
   Post: "cat-post",
   "Post FX": "cat-post",
+  Particle: "cat-particle",
   Texture: "cat-texture",
   Model: "cat-model",
   Advanced: "cat-advanced",

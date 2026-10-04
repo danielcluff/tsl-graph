@@ -30,19 +30,40 @@ export interface GraphOutput {
   ok: boolean;
 }
 
+/**
+ * Free identifiers a particle graph reads (Particle Age, …). Whoever evaluates
+ * `runtime.particle` passes them as parameters, in this order (see
+ * runtime/particle.ts); the exported module takes them as one object.
+ */
+export const PARTICLE_INPUTS = [
+  { ident: "particleAge", key: "age" },
+  { ident: "particleSeed", key: "seed" },
+  { ident: "particleLife", key: "life" },
+  { ident: "particleVelocity", key: "velocity" },
+  { ident: "particleColor", key: "color" },
+  { ident: "particleUv", key: "uv" },
+  { ident: "particleShape", key: "shape" },
+] as const;
+
 export interface CompileResult {
   /** Complete, self-contained ES module. */
   code: string;
-  /** Function bodies evaluated by the live preview (see runtime/evaluate.ts). */
-  runtime: { material: string; post: string };
+  /**
+   * Function bodies evaluated by the live preview (see runtime/scope.ts).
+   * `particle` takes the PARTICLE_INPUTS identifiers as parameters.
+   */
+  runtime: { material: string; post: string; particle: string };
   material: GraphOutput;
   post: GraphOutput & { connected: boolean };
+  /** Particle shader projects: the particle graph, and which outputs are connected. */
+  particle: GraphOutput & { color: boolean; opacity: boolean };
   globals: Record<string, string>;
   diagnostics: Diagnostic[];
   utils: string[];
 }
 
 export function compileProject(doc: ProjectDoc): CompileResult {
+  if (doc.kind === "particle") return compileParticleProject(doc);
   const diagnostics: Diagnostic[] = [];
   const utilsUsed = new Set<string>();
   const shared: Shared = { doc, diagnostics, utilsUsed, failed: new Set() };
@@ -108,7 +129,7 @@ export function compileProject(doc: ProjectDoc): CompileResult {
 
   return {
     code,
-    runtime: { material: runtimeMaterial, post: runtimePost },
+    runtime: { material: runtimeMaterial, post: runtimePost, particle: NO_PARTICLE_BODY },
     material: { lines: material.lines, nodes: material.nodes, uniforms: material.uniforms, ok: material.ok },
     post: {
       lines: post.lines,
@@ -116,6 +137,68 @@ export function compileProject(doc: ProjectDoc): CompileResult {
       uniforms: post.uniforms,
       ok: post.ok,
       connected: post.connected,
+    },
+    particle: { lines: [], nodes: {}, uniforms: {}, ok: false, color: false, opacity: false },
+    globals: globalsOut.names,
+    diagnostics,
+    utils,
+  };
+}
+
+const NO_MATERIAL_BODY = "return { material: null, nodes: {}, uniforms: {} };";
+const NO_POST_BODY = "return { outputNode: null, nodes: {}, uniforms: {} };";
+const NO_PARTICLE_BODY = "return { color: null, opacity: null, nodes: {}, uniforms: {} };";
+
+/** A particle shader: one graph, compiled to a function of the particle inputs. */
+function compileParticleProject(doc: ProjectDoc): CompileResult {
+  const diagnostics: Diagnostic[] = [];
+  const utilsUsed = new Set<string>();
+  const shared: Shared = { doc, diagnostics, utilsUsed, failed: new Set() };
+  const globalsOut = emitGlobals(doc);
+  const particle = compileParticleGraph(shared, globalsOut.names);
+  const subgraphs = dedupeBlocks(particle.subgraphLines);
+  const utils = utilClosure(utilsUsed);
+  const utilCode = utils.map((u) => UTIL_SOURCES[u].code);
+  const ret = `return { color: ${particle.colorExpr ?? "null"}, opacity: ${particle.opacityExpr ?? "null"}`;
+
+  // -- exported module: a function the elate-particles runtime calls per sprite material
+  const body: string[] = [];
+  if (utilCode.length) body.push("// Inline TSL Utils", ...utilCode, "");
+  if (globalsOut.lines.length) body.push("// Globals", ...globalsOut.lines, "");
+  if (subgraphs.length) body.push(...subgraphs, "");
+  body.push(
+    "// Particle Graph",
+    "// Give it to elate-particles: new ParticleWorld({ shaders: (id) => (id === SHADER_ID ? particleShader : undefined) })",
+    "// A null `color` / `opacity` keeps the renderer's own (colour × shape).",
+    `export function particleShader({ ${PARTICLE_INPUTS.map((i) => `${i.key}: ${i.ident}`).join(", ")} }) {`,
+    ...particle.lines.map((l) => (l ? `  ${l}` : l)),
+    `  ${ret} };`,
+    "}",
+  );
+  const bodyText = body.join("\n");
+  const code = [...buildImports(bodyText, particle.addonImports), "", bodyText, ""].join("\n");
+
+  const runtimeParticle = [
+    ...utilCode,
+    ...globalsOut.lines,
+    ...subgraphs,
+    ...particle.lines,
+    `${ret}, nodes: { ${objEntries(particle.nodes)} }, uniforms: { ${objEntries({ ...particle.uniforms, ...prefixKeys(globalsOut.names, "global:") })} } };`,
+  ].join("\n");
+
+  const none = { lines: [], nodes: {}, uniforms: {}, ok: false };
+  return {
+    code,
+    runtime: { material: NO_MATERIAL_BODY, post: NO_POST_BODY, particle: runtimeParticle },
+    material: none,
+    post: { ...none, connected: false },
+    particle: {
+      lines: particle.lines,
+      nodes: particle.nodes,
+      uniforms: particle.uniforms,
+      ok: particle.ok,
+      color: !!particle.colorExpr,
+      opacity: !!particle.opacityExpr,
     },
     globals: globalsOut.names,
     diagnostics,
@@ -463,7 +546,7 @@ function topoOrder(scope: Scope, nodes: GraphNode[], collapse: (id: string) => s
   return sorted;
 }
 
-const SKIP_KINDS = new Set(["comment", "group", "material", "postOutput", "subgraphOutput"]);
+const SKIP_KINDS = new Set(["comment", "group", "material", "postOutput", "particleOutput", "subgraphOutput"]);
 
 function compileNodes(scope: Scope, nodes: GraphNode[], container?: string) {
   // Nodes inside a loop container compile inside that loop; for ordering the
@@ -1144,6 +1227,44 @@ function compilePostGraph(
     outputExpr,
     toneMapping,
   };
+}
+
+function compileParticleGraph(
+  shared: Shared,
+  globals: Record<string, string>,
+): DriverResult & { colorExpr: string | null; opacityExpr: string | null } {
+  const graph = shared.doc.graphs.particle;
+  const scope = newScope(shared, "particle", graph, globals);
+  for (const i of PARTICLE_INPUTS) scope.names.add(i.ident);
+  compileNodes(scope, graph.nodes);
+  const outs = graph.nodes.filter((n) => n.type === "particle/output");
+  const result = { lines: scope.lines, nodes: scope.nodesOut, uniforms: scope.uniformsOut, subgraphLines: scope.subgraphLines, addonImports: scope.addonImports };
+  if (!outs.length) {
+    shared.diagnostics.push({ level: "error", message: "Particle Output is missing", graph: "particle" });
+    return { ...result, ok: false, colorExpr: null, opacityExpr: null };
+  }
+  for (const extra of outs.slice(1))
+    shared.diagnostics.push({ level: "warning", message: "Only the first Particle Output is used", nodeId: extra.id, graph: "particle" });
+  const out = outs[0];
+  let ok = true;
+  const port = (key: "color" | "opacity") => {
+    const e = incomingEdge(scope, out.id, key);
+    if (!e) return null;
+    try {
+      return outputRef(scope, e.source, e.sourceHandle);
+    } catch (err) {
+      ok = false;
+      if (!(err instanceof UpstreamError))
+        shared.diagnostics.push({ level: "error", message: `Particle Output: ${err instanceof Error ? err.message : String(err)}`, nodeId: out.id, graph: "particle" });
+      return null;
+    }
+  };
+  const colorExpr = port("color");
+  const opacityExpr = port("opacity");
+  if (ok && !colorExpr && !opacityExpr)
+    shared.diagnostics.push({ level: "warning", message: "Particle Output has nothing connected: particles keep their own look", nodeId: out.id, graph: "particle" });
+  // vec3(...) / float(...) so a scalar into Color, or a vec4 into Opacity, still has the right type
+  return { ...result, ok, colorExpr: colorExpr && `vec3(${colorExpr})`, opacityExpr: opacityExpr && `float(${opacityExpr})` };
 }
 
 // ---------------------------------------------------------------------------

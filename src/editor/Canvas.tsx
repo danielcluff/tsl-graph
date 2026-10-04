@@ -268,14 +268,14 @@ function CardNode(props: NodeProps<GraphNode["data"]>) {
   const connectedIn = createMemo(() => canvas.connected().ins.get(id), { equals: sameKeys });
   const connectedOut = createMemo(() => canvas.connected().outs.get(id), { equals: sameKeys });
   const error = createMemo(() => canvas.errors().get(id));
-  // thumbnails are rendered from the compiled material graph only
+  // thumbnails are rendered from the compiled main graph only (material, or particle)
   // nodes inside a loop compile into the loop body, so they have no standalone value to show
   const inLoop = () => {
     const parentId = node().parentId;
     const parent = parentId ? ed.nodesById().get(parentId) : undefined;
     return !!parent && getNodeDef(parent.type)?.kind === "loop";
   };
-  const previewable = () => ed.state.graph === "material" && hasPreview(node().type) && !inLoop();
+  const previewable = () => (ed.state.graph === "material" || ed.state.graph === "particle") && hasPreview(node().type) && !inLoop();
   // math nodes whose output can't vary across the surface show just their value, no picture
   const surfaceUniform = createMemo(() => getNodeDef(node().type)?.category === "Math" && !!ed.surfaceUniform().get(id));
 

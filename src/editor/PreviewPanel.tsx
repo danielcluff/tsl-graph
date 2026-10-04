@@ -1,7 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onSettled, snapshot, untrack, useContext } from "solid-js";
 import { Camera, CircleAlert, Crosshair, Maximize2, Minimize2, SlidersHorizontal } from "lucide-static";
 import type { GeometryKind, GraphKind, PreviewSettings } from "../core/types";
-import { animatedNodes, hasPreview, nodePreviewOn, nodeSignatures, resolveSettings } from "../core/graph";
+import { animatedNodes, hasPreview, nodePreviewOn, nodeSignatures, primaryGraph, resolveSettings } from "../core/graph";
 import { getNodeDef } from "../core/registry";
 import { ENVIRONMENTS, PreviewRenderer } from "../runtime/preview";
 import { LIVE_PREVIEW_ZOOM } from "../runtime/preview-size";
@@ -150,12 +150,14 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
 
   // apply compiled graph
   createEffect(
-    () => [ed.compiled(), ready(), ed.state.doc.settings.enablePost] as const,
-    ([result, isReady, enablePost]) => {
+    () => [ed.compiled(), ready(), ed.state.doc.settings.enablePost, ed.state.doc.kind === "particle"] as const,
+    ([result, isReady, enablePost, particle]) => {
       if (!result || !isReady || !preview) return;
       // per-node signatures let unchanged previews keep their shaders across recompiles
-      const signatures = untrack(() => nodeSignatures(ed.state.doc, ed.state.doc.graphs.material));
-      const errors = preview.apply(result.runtime.material, result.post.connected && enablePost ? result.runtime.post : null, signatures);
+      const signatures = untrack(() => nodeSignatures(ed.state.doc, ed.state.doc.graphs[particle ? "particle" : "material"]));
+      const errors = particle
+        ? preview.applyParticle(result.runtime.particle, signatures)
+        : preview.apply(result.runtime.material, result.post.connected && enablePost ? result.runtime.post : null, signatures);
       ed.setState((s) => void (s.runtimeErrors = errors));
     },
   );
@@ -188,6 +190,8 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
   // redraws on edits and camera movement only.
   const mainAnimated = createMemo(() => {
     const doc = ed.state.doc;
+    // particle previews always move (the test sprites age)
+    if (doc.kind === "particle") return true;
     const mat = doc.graphs.material.nodes.find((n) => getNodeDef(n.type)?.kind === "material");
     if (mat && animatedNodes(doc, doc.graphs.material).has(mat.id)) return true;
     if (!doc.settings.enablePost) return false;
@@ -203,7 +207,8 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
   createEffect(
     () => {
       ui.debugVersion();
-      if (ed.state.graph !== "material") return [];
+      // thumbnails come from the main graph's evaluation (material, or particle)
+      if (ed.state.graph !== primaryGraph(ed.state.doc) || ed.state.graph === "post") return [];
       return ed
         .graph()
         .nodes.filter((n) => nodePreviewOn(ed.state.doc, n) && hasPreview(n.type))

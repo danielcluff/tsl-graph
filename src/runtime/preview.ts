@@ -5,6 +5,7 @@ import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { PreviewSettings } from "../core/types";
 import { PREVIEW_SIZE, paceFrame } from "./preview-size";
+import { applyParticleCloud, createParticleCloud, evaluateParticle, particleThumbnailInputs } from "./particle";
 import { evaluateMaterial, evaluatePost, setTextureLoadedHandler, type MaterialResult, type PostResult } from "./scope";
 
 const DREI = "https://raw.githack.com/pmndrs/drei-assets/456060a26bbeb8fdf79326f224b6d99b8bcce736/hdri/";
@@ -80,6 +81,9 @@ export class PreviewRenderer {
   settings!: PreviewSettings;
   materialResult?: MaterialResult;
   postResult?: PostResult;
+  /** Particle shader projects: test sprites in place of the mesh. */
+  private particleCloud?: THREE.InstancedMesh;
+  private particleUniforms?: MaterialResult["uniforms"];
   ready: Promise<void>;
   private fallbackMaterial = new THREE.MeshStandardNodeMaterial({ color: 0x888888 });
   private envCache = new Map<string, THREE.Texture>();
@@ -239,6 +243,34 @@ export class PreviewRenderer {
   // graph application
   // -------------------------------------------------------------------------
 
+  /**
+   * Particle shader projects: show the graph on a cloud of test sprites (in
+   * place of the mesh); node thumbnails show a grid of sprites by age.
+   */
+  applyParticle(body: string, signatures?: Map<string, string>): string[] {
+    const errors: string[] = [];
+    if (!this.renderer) return errors;
+    this.contentVersion++;
+    this.nodeSignatures = signatures;
+    this.invalidate();
+    this.clearPost();
+    this.mesh.visible = false;
+    if (!this.particleCloud) {
+      this.particleCloud = createParticleCloud();
+      this.scene.add(this.particleCloud);
+    }
+    this.particleCloud.visible = true;
+    try {
+      // thumbnails: the same body with grid bindings
+      const thumbs = evaluateParticle(body, particleThumbnailInputs());
+      this.materialResult = { material: null, nodes: thumbs.nodes, uniforms: thumbs.uniforms };
+      this.particleUniforms = applyParticleCloud(this.particleCloud, body);
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+    return errors;
+  }
+
   /** Evaluate compiled bodies. Returns error strings (empty on success). */
   apply(materialBody: string, postBody: string | null, signatures?: Map<string, string>): string[] {
     const errors: string[] = [];
@@ -246,6 +278,8 @@ export class PreviewRenderer {
     this.contentVersion++;
     this.nodeSignatures = signatures;
     this.invalidate();
+    this.mesh.visible = true;
+    if (this.particleCloud) this.particleCloud.visible = false;
     try {
       const res = evaluateMaterial(materialBody);
       this.materialResult = res;
@@ -292,7 +326,7 @@ export class PreviewRenderer {
   setUniform(key: string, value: unknown): boolean {
     let found = false;
     // kept preview materials may still read the uniforms of an earlier evaluation
-    const maps = new Set([this.materialResult?.uniforms, this.postResult?.uniforms, ...[...this.debugMats.values()].map((e) => e.uniforms)]);
+    const maps = new Set([this.materialResult?.uniforms, this.postResult?.uniforms, this.particleUniforms, ...[...this.debugMats.values()].map((e) => e.uniforms)]);
     for (const uniforms of maps) {
       const u = uniforms?.[key];
       if (!u) continue;

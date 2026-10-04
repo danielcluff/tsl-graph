@@ -113,7 +113,9 @@ function ProjectList() {
                       <div class="px-3 py-2 text-sm font-medium">{p.name}</div>
                     </a>
                     <div class="flex justify-between px-3 pb-2 text-xs text-muted-foreground">
-                      <span>{p.nodeCount} nodes</span>
+                      <span>
+                        {p.nodeCount} nodes{p.kind === "particle" ? " · particle shader" : ""}
+                      </span>
                       <button
                         type="button"
                         class="hover:text-destructive"

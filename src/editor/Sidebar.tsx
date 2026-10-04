@@ -12,7 +12,7 @@ export function Sidebar() {
   const [customTab, setCustomTab] = createSignal<"project" | "library" | "community">("project");
   const [libVersion, setLibVersion] = createSignal(0);
 
-  const graphKind = (): GraphKind => (ed.state.graph === "post" ? "post" : "material");
+  const graphKind = (): GraphKind => ed.topGraph();
   const categories = createMemo(() => {
     const q = query().toLowerCase().trim();
     const cats = libraryCategories(graphKind());

@@ -2,7 +2,7 @@ import { For, Match, Show, Switch as SwitchFlow, createMemo, createSignal, useCo
 import { Code2, Layers, Pencil, Plus, Trash2, Upload, Waypoints } from "lucide-static";
 import { defaultGlobalValue } from "../core/commands";
 import { multiOpHandleId, multiOpInfo, multiOpParams } from "../core/multiop";
-import { ANY_VALUE_TYPES, LOOP_COMPARES, LOOP_MODES, convertAnyValue, findSubgraph, literalType, loopModeOf, nodeTitle, resolvePorts, uid, type AnyValueType, type LoopMode } from "../core/graph";
+import { ANY_VALUE_TYPES, LOOP_COMPARES, LOOP_MODES, convertAnyValue, findSubgraph, literalType, loopModeOf, nodeTitle, projectGraphs, resolvePorts, uid, type AnyValueType, type LoopMode } from "../core/graph";
 import { getNodeDef, typeColor } from "../core/registry";
 import type { GlobalDef, GraphNode, PortDef } from "../core/types";
 import {
@@ -937,7 +937,7 @@ function Uniforms() {
   const ed = useContext(EditorContext);
   const session = useEditSession(ed);
   const nodes = createMemo(() =>
-    (["material", "post"] as const).flatMap((g) =>
+    projectGraphs(ed.state.doc).flatMap((g) =>
       ed.state.doc.graphs[g].nodes.filter((n) => n.type === "const/uniform").map((n) => ({ graph: g, node: n })),
     ),
   );

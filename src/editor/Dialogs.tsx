@@ -1,9 +1,9 @@
 import { For, Match, Show, Switch, createMemo, createSignal, untrack, useContext } from "solid-js";
 import { Check, Copy, Download } from "lucide-static";
-import { nodeTitle } from "../core/graph";
+import { nodeCount, nodeTitle } from "../core/graph";
 import { CATEGORY_HEADER, getNodeDef, typeColor } from "../core/registry";
 import { TEMPLATES, projectFromTemplate } from "../core/templates";
-import type { CodeNodeData } from "../core/types";
+import type { CodeNodeData, GraphKind } from "../core/types";
 import { HostContext, graphMcpUrl } from "./host";
 import { Button, Checkbox, Dialog, Icon, Input, Select, Tabs } from "../ui";
 import { CodeEditor } from "./CodeEditor";
@@ -50,7 +50,7 @@ function CopyButton(props: { text: () => string }) {
 function CodeViewDialog() {
   const ed = useContext(EditorContext);
   const code = () => ed.compiled()?.code ?? "";
-  const count = () => ed.state.doc.graphs.material.nodes.length + ed.state.doc.graphs.post.nodes.length;
+  const count = () => nodeCount(ed.state.doc);
   return (
     <Dialog
       open={ui.dialog() === "code"}
@@ -587,7 +587,7 @@ function ClearDialog() {
           variant="destructive"
           onClick={() => {
             ed.mutate((doc) => {
-              const g = ed.state.graph === "post" ? doc.graphs.post : ed.state.graph === "material" ? doc.graphs.material : null;
+              const g = ed.state.graph.startsWith("sg:") ? null : doc.graphs[ed.state.graph as GraphKind];
               if (g) {
                 g.nodes = [];
                 g.edges = [];

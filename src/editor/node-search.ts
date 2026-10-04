@@ -21,7 +21,7 @@ export function compatiblePort(def: NodeDef, from: PendingWire, doc: ProjectDoc)
 /** Node types that can be added to the active graph (optionally: that accept a dragged wire). */
 export function addableNodeDefs(ed: Editor, from?: PendingWire): NodeDef[] {
   const graph = ed.state.graph;
-  const kind: GraphKind = graph === "post" ? "post" : "material";
+  const kind: GraphKind = ed.topGraph();
   let defs = allNodeDefs().filter(
     (d) =>
       d.category !== "Subgraph" &&

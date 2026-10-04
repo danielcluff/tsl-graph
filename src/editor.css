@@ -115,6 +115,7 @@
 .cat-material { background: var(--color-orange-100); }
 .cat-subgraph { background: var(--color-blue-100); }
 .cat-post { background: var(--color-teal-100); }
+.cat-particle { background: var(--color-amber-100); }
 .cat-texture { background: var(--color-pink-100); }
 .cat-model { background: var(--color-cyan-100); }
 .cat-advanced { background: var(--color-slate-100); }
@@ -131,6 +132,7 @@
 .tsl-dark .cat-material { background: color-mix(in oklab, var(--color-orange-900) 20%, transparent); }
 .tsl-dark .cat-subgraph { background: color-mix(in oklab, var(--color-blue-900) 20%, transparent); }
 .tsl-dark .cat-post { background: color-mix(in oklab, var(--color-teal-900) 20%, transparent); }
+.tsl-dark .cat-particle { background: color-mix(in oklab, var(--color-amber-900) 20%, transparent); }
 .tsl-dark .cat-texture { background: color-mix(in oklab, var(--color-pink-900) 20%, transparent); }
 .tsl-dark .cat-model { background: color-mix(in oklab, var(--color-cyan-900) 20%, transparent); }
 .tsl-dark .cat-advanced { background: color-mix(in oklab, var(--color-slate-900) 20%, transparent); }

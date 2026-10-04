@@ -15,6 +15,9 @@ import {
   createLoop as coreCreateLoop,
   setLoopMode as coreSetLoopMode,
   normalizeDoc,
+  GRAPH_KINDS,
+  primaryGraph,
+  projectGraphs,
   uniformAcrossSurface,
   animatedNodes,
   type LoopMode,
@@ -89,7 +92,7 @@ export function createEditor(
   const persist = !!opts.save;
   const [state, setState] = createStore({
     doc: normalizeDoc(initial),
-    graph: "material" as GraphRef,
+    graph: primaryGraph(initial) as GraphRef,
     selection: { nodes: [] as string[], edges: [] as string[] },
     viewports: {} as Record<string, Viewport>,
     mode: (PAN_MODE_ENABLED ? "pan" : "select") as Mode,
@@ -137,7 +140,8 @@ export function createEditor(
   const animated = createMemo(() => animatedNodes(state.doc, graph()));
   const viewport = createMemo<Viewport>(() => state.viewports[state.graph] ?? { x: 120, y: 80, zoom: 1 });
   const diagnostics = createMemo<Diagnostic[]>(() => compiled()?.diagnostics ?? []);
-  const topGraph = (): GraphKind => (state.graph === "post" ? "post" : "material");
+  /** The top-level graph being edited (a subgraph counts as the project's main graph). */
+  const topGraph = (): GraphKind => (GRAPH_KINDS.includes(state.graph as GraphKind) ? (state.graph as GraphKind) : primaryGraph(state.doc));
 
   // ---- history ---------------------------------------------------------------
   const serialize = (): string =>
@@ -160,7 +164,8 @@ export function createEditor(
   function restore(entry: string) {
     const h = JSON.parse(entry) as HistoryEntry;
     setState((s) => {
-      for (const k of ["material", "post"] as const) {
+      for (const k of GRAPH_KINDS) {
+        if (!h.graphs[k]) continue;
         reconcile(h.graphs[k].nodes, "id")(s.doc.graphs[k].nodes);
         reconcile(h.graphs[k].edges, "id")(s.doc.graphs[k].edges);
       }
@@ -242,9 +247,14 @@ export function createEditor(
     } catch (err) {
       setCompiled({
         code: "",
-        runtime: { material: "return { material: null, nodes: {}, uniforms: {} };", post: "return { outputNode: null, nodes: {}, uniforms: {} };" },
+        runtime: {
+          material: "return { material: null, nodes: {}, uniforms: {} };",
+          post: "return { outputNode: null, nodes: {}, uniforms: {} };",
+          particle: "return { color: null, opacity: null, nodes: {}, uniforms: {} };",
+        },
         material: { lines: [], nodes: {}, uniforms: {}, ok: false },
         post: { lines: [], nodes: {}, uniforms: {}, ok: false, connected: false },
+        particle: { lines: [], nodes: {}, uniforms: {}, ok: false, color: false, opacity: false },
         globals: {},
         diagnostics: [{ level: "error", message: `Compiler crashed: ${err instanceof Error ? err.message : err}` }],
         utils: [],
@@ -289,7 +299,7 @@ export function createEditor(
     normalizeDoc(doc);
     setState((s) => {
       s.doc = doc;
-      s.graph = "material";
+      s.graph = primaryGraph(doc);
       s.selection = { nodes: [], edges: [] };
       s.subgraph = null;
     });
@@ -876,7 +886,7 @@ export function createEditor(
     // redo it with real sizes and frame the result.
     const ops = cmd.op === "batch" ? cmd.ops : [cmd];
     const layoutOp = ops.find((o) => o.op === "autoLayout") as { graph?: GraphRef } | undefined;
-    if (layoutOp && (layoutOp.graph ?? "material") === state.graph) {
+    if (layoutOp && (layoutOp.graph ?? primaryGraph(state.doc)) === state.graph) {
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           const sizes = new Map(graph().nodes.map((n) => [n.id, nodeSize(n)]));
@@ -906,7 +916,7 @@ export function createEditor(
     const has = (g: GraphRef) => graphOf(state.doc, g).nodes.some((n) => n.id === nodeId);
     if (!has(state.graph)) {
       if (state.subgraph) return false; // don't leave an open editing session behind
-      const top = ([hint, "material", "post"].filter(Boolean) as GraphKind[]).find(has);
+      const top = ([hint, ...projectGraphs(state.doc)].filter(Boolean) as GraphKind[]).find(has);
       if (top) setGraph(top);
       else {
         const sg = state.doc.customNodes.find((d) => d.graph.nodes.some((n) => n.id === nodeId));

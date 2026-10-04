@@ -14,7 +14,10 @@ import {
   setLoopMode,
   type LoopMode,
   graphOf,
+  GRAPH_KINDS,
   inferTypes,
+  primaryGraph,
+  projectGraphs,
   nodeTitle,
   removeNodes,
   resolvePorts,
@@ -102,10 +105,14 @@ function resolveRef(refs: Refs, id: string | undefined): string {
   return id;
 }
 
-function g(cmd: { graph?: GraphRef }): GraphRef {
-  const graph = cmd.graph ?? "material";
-  if (graph !== "material" && graph !== "post" && !graph.startsWith("sg:"))
-    throw new CommandError(`Unknown graph "${graph}"`);
+/** The command's graph: given, or the project's main graph (material, or particle for particle shaders). */
+function g(doc: ProjectDoc, cmd: { graph?: GraphRef }): GraphRef {
+  const graph = cmd.graph ?? primaryGraph(doc);
+  if (graph.startsWith("sg:")) return graph;
+  if (!projectGraphs(doc).includes(graph as GraphKind)) {
+    if (!GRAPH_KINDS.includes(graph as GraphKind)) throw new CommandError(`Unknown graph "${graph}"`);
+    throw new CommandError(`This ${doc.kind === "particle" ? "particle shader" : "material"} project has no "${graph}" graph (graphs: ${projectGraphs(doc).join(", ")})`);
+  }
   return graph;
 }
 
@@ -120,10 +127,10 @@ function nextPosition(doc: ProjectDoc, graph: GraphRef): XY {
 export function executeCommand(doc: ProjectDoc, cmd: Command, refs: Refs = new Map()): unknown {
   switch (cmd.op) {
     case "getGraph":
-      return describeGraph(doc, g(cmd));
+      return describeGraph(doc, g(doc, cmd));
 
     case "addNode": {
-      const graph = g(cmd);
+      const graph = g(doc, cmd);
       const def = getNodeDef(cmd.type);
       if (!def) {
         const suggestions = allNodeDefs()
@@ -179,7 +186,7 @@ export function executeCommand(doc: ProjectDoc, cmd: Command, refs: Refs = new M
     }
 
     case "connect": {
-      const graph = g(cmd);
+      const graph = g(doc, cmd);
       const source = resolveRef(refs, cmd.source);
       const target = resolveRef(refs, cmd.target);
       const res = connect(doc, graph, {
@@ -193,7 +200,7 @@ export function executeCommand(doc: ProjectDoc, cmd: Command, refs: Refs = new M
     }
 
     case "disconnect": {
-      const graph = g(cmd);
+      const graph = g(doc, cmd);
       const edges = graphOf(doc, graph).edges;
       const ids = cmd.edgeId
         ? [cmd.edgeId]
@@ -206,7 +213,7 @@ export function executeCommand(doc: ProjectDoc, cmd: Command, refs: Refs = new M
     }
 
     case "updateNode": {
-      const graph = g(cmd);
+      const graph = g(doc, cmd);
       const id = resolveRef(refs, cmd.nodeId);
       const node = graphOf(doc, graph).nodes.find((n) => n.id === id);
       if (!node) throw new CommandError(`Node "${id}" not found in ${graph} graph`);
@@ -249,7 +256,7 @@ export function executeCommand(doc: ProjectDoc, cmd: Command, refs: Refs = new M
     }
 
     case "deleteNodes": {
-      const graph = g(cmd);
+      const graph = g(doc, cmd);
       const ids = cmd.nodeIds.map((i) => resolveRef(refs, i));
       const missing = ids.filter((i) => !graphOf(doc, graph).nodes.some((n) => n.id === i));
       if (missing.length) throw new CommandError(`Nodes not found: ${missing.join(", ")}`);
@@ -258,11 +265,11 @@ export function executeCommand(doc: ProjectDoc, cmd: Command, refs: Refs = new M
     }
 
     case "autoLayout":
-      autoLayout(graphOf(doc, g(cmd)));
+      autoLayout(graphOf(doc, g(doc, cmd)));
       return { ok: true };
 
     case "clearGraph": {
-      const gr = graphOf(doc, g(cmd));
+      const gr = graphOf(doc, g(doc, cmd));
       gr.nodes = [];
       gr.edges = [];
       return { ok: true };
@@ -438,7 +445,7 @@ export function describeNodeType(type: string) {
     description: def.description,
     tsl: def.tsl && !def.tsl.startsWith("__") ? def.tsl : undefined,
     importFrom: def.importFrom,
-    graphs: def.graphs ?? ["material", "post"],
+    graphs: def.graphs ?? GRAPH_KINDS,
     inputs: def.inputs.map((p) => ({
       key: p.key,
       label: p.label,

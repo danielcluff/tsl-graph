@@ -5,6 +5,7 @@ import type {
   Graph,
   GraphEdge,
   GraphKind,
+  ProjectKind,
   GraphNode,
   MultiOpOperation,
   GraphRef,
@@ -65,7 +66,24 @@ export function emptyGraph(): Graph {
   return { nodes: [], edges: [] };
 }
 
-export function createProject(name = "Untitled"): ProjectDoc {
+export const GRAPH_KINDS: GraphKind[] = ["material", "post", "particle"];
+
+/** The top-level graphs a project edits: material + post, or the particle graph. */
+export function projectGraphs(doc: Pick<ProjectDoc, "kind">): GraphKind[] {
+  return doc.kind === "particle" ? ["particle"] : ["material", "post"];
+}
+
+/** The graph a project opens on. */
+export function primaryGraph(doc: Pick<ProjectDoc, "kind">): GraphKind {
+  return doc.kind === "particle" ? "particle" : "material";
+}
+
+/** Every graph body in the project: the top-level graphs and each subgraph. */
+export function allGraphs(doc: ProjectDoc): Graph[] {
+  return [...GRAPH_KINDS.map((k) => doc.graphs[k]).filter(Boolean), ...(doc.customNodes ?? []).map((s) => s.graph)];
+}
+
+export function createProject(name = "Untitled", kind: ProjectKind = "material"): ProjectDoc {
   const now = Date.now();
   const doc: ProjectDoc = {
     id: uid("p"),
@@ -73,11 +91,27 @@ export function createProject(name = "Untitled"): ProjectDoc {
     createdAt: now,
     updatedAt: now,
     version: 1,
-    graphs: { material: emptyGraph(), post: emptyGraph() },
+    ...(kind === "particle" ? { kind } : {}),
+    graphs: { material: emptyGraph(), post: emptyGraph(), particle: emptyGraph() },
     globals: [],
     customNodes: [],
     settings: defaultSettings(),
   };
+  if (kind === "particle") {
+    // the default look: the particle's colour, masked by its sprite shape
+    const color = addNode(doc, "particle", "particle/color", { x: 80, y: 120 });
+    const shape = addNode(doc, "particle", "particle/shape", { x: 80, y: 300 });
+    const rgb = addNode(doc, "particle", "math/mul", { x: 340, y: 140 });
+    const alpha = addNode(doc, "particle", "math/mul", { x: 340, y: 300 });
+    const out = addNode(doc, "particle", "particle/output", { x: 600, y: 200 });
+    connect(doc, "particle", { source: color.id, sourceHandle: "rgb", target: rgb.id, targetHandle: "a" });
+    connect(doc, "particle", { source: shape.id, sourceHandle: "rgb", target: rgb.id, targetHandle: "b" });
+    connect(doc, "particle", { source: color.id, sourceHandle: "w", target: alpha.id, targetHandle: "a" });
+    connect(doc, "particle", { source: shape.id, sourceHandle: "w", target: alpha.id, targetHandle: "b" });
+    connect(doc, "particle", { source: rgb.id, sourceHandle: "out", target: out.id, targetHandle: "color" });
+    connect(doc, "particle", { source: alpha.id, sourceHandle: "out", target: out.id, targetHandle: "opacity" });
+    return doc;
+  }
   addNode(doc, "material", "material/standard", { x: 400, y: 200 });
   const pin = addNode(doc, "post", "post/input", { x: 80, y: 160 });
   const pout = addNode(doc, "post", "post/output", { x: 460, y: 180 });
@@ -323,7 +357,9 @@ function multiOpResultType(operations: MultiOpOperation[], inTypes: Record<strin
 
 /** Bring documents saved by older versions up to date (in place). */
 export function normalizeDoc(doc: ProjectDoc): ProjectDoc {
-  for (const g of [doc.graphs.material, doc.graphs.post, ...(doc.customNodes ?? []).map((s) => s.graph)]) migrateLegacyMultiOps(g);
+  // projects from before the particle graph kind
+  doc.graphs.particle ??= emptyGraph();
+  for (const g of allGraphs(doc)) migrateLegacyMultiOps(g);
   return doc;
 }
 
@@ -564,7 +600,7 @@ export function nodeTitle(doc: ProjectDoc, node: GraphNode): string {
   if (def?.kind === "uniform" && node.data.localName) return node.data.localName;
   if (def?.kind === "localSet") return node.data.localName ? `Set ${node.data.localName}` : def.label;
   if (def?.kind === "localGet") {
-    const all = [...doc.graphs.material.nodes, ...doc.graphs.post.nodes, ...doc.customNodes.flatMap((s) => s.graph.nodes)];
+    const all = allGraphs(doc).flatMap((g) => g.nodes);
     const src = all.find((n) => n.id === node.data.localSourceId);
     return src?.data.localName ? `Get ${src.data.localName}` : def.label;
   }
@@ -572,10 +608,10 @@ export function nodeTitle(doc: ProjectDoc, node: GraphNode): string {
 }
 
 export function nodeCount(doc: ProjectDoc): number {
-  return doc.graphs.material.nodes.length + doc.graphs.post.nodes.length;
+  return projectGraphs(doc).reduce((n, k) => n + (doc.graphs[k]?.nodes.length ?? 0), 0);
 }
 
-const NO_PREVIEW_KINDS = new Set(["comment", "group", "loop", "loopPart", "material", "postOutput", "placeholder", "subgraphInput", "subgraphOutput"]);
+const NO_PREVIEW_KINDS = new Set(["comment", "group", "loop", "loopPart", "material", "postOutput", "particleOutput", "placeholder", "subgraphInput", "subgraphOutput"]);
 
 /** Whether nodes of this type produce a value that can be shown as a preview thumbnail. */
 export function hasPreview(type: string): boolean {
@@ -591,8 +627,7 @@ export function nodePreviewOn(doc: ProjectDoc, node: GraphNode): boolean {
 /** Set the project default and drop every per-node override so all nodes follow it. */
 export function setNodePreviewDefault(doc: ProjectDoc, on: boolean): void {
   doc.settings.nodePreviews = on;
-  const graphs = [doc.graphs.material, doc.graphs.post, ...doc.customNodes.map((sg) => sg.graph)];
-  for (const g of graphs) for (const n of g.nodes) delete n.data.debug;
+  for (const g of allGraphs(doc)) for (const n of g.nodes) delete n.data.debug;
 }
 
 // ---------------------------------------------------------------------------

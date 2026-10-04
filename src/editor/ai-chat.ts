@@ -201,7 +201,9 @@ export function createChat(ed: Editor, host: GraphHost) {
       "<editor_state>",
       `project: ${ed.state.doc.name}`,
       `active graph: ${g.startsWith("sg:") ? "subgraph (editing)" : g}`,
-      `material graph: ${ed.state.doc.graphs.material.nodes.length} nodes, post graph: ${ed.state.doc.graphs.post.nodes.length} nodes`,
+      ed.state.doc.kind === "particle"
+        ? `particle shader: ${ed.state.doc.graphs.particle.nodes.length} nodes`
+        : `material graph: ${ed.state.doc.graphs.material.nodes.length} nodes, post graph: ${ed.state.doc.graphs.post.nodes.length} nodes`,
       selected.length ? `selected: ${selected.join(", ")}` : "selected: nothing",
       problems.length ? `problems:\n${problems.slice(0, 8).join("\n")}` : "problems: none",
       "</editor_state>",
