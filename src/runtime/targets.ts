@@ -62,6 +62,22 @@ export interface TargetPreviewContext {
   camera: THREE.Camera;
   /** The preview's own mesh (its geometry follows the project's preview settings). Hidden while a target preview shows. */
   mesh: THREE.Mesh;
+  /** The preview canvas, e.g. to let the user click the preview (remove listeners in `dispose`). */
+  domElement: HTMLElement;
+  renderer: THREE.WebGPURenderer;
+  /** The project's values for the preview's `settings` (defaults filled in). */
+  settings: Record<string, string>;
+  /** Ask for `apply` to run again, e.g. once something it loads asynchronously arrives. */
+  refresh(): void;
+}
+
+/** A choice a target preview offers in the editor's preview settings. */
+export interface TargetPreviewSetting {
+  key: string;
+  label: string;
+  /** The choices (called when the settings open, so they can change over time). */
+  options(): { value: string; label: string }[];
+  default?: string;
 }
 
 /** How the editor previews a function target. */
@@ -80,6 +96,8 @@ export interface TargetPreview {
   thumbnailInputs(): Record<string, Node>;
   /** The preview always moves (e.g. particles age), so render continuously. */
   animated?: boolean;
+  /** Choices shown in the preview settings; their values reach `apply` as `ctx.settings`. */
+  settings?: TargetPreviewSetting[];
   /** Called before the object is removed (switching away from the target). */
   dispose?(object: THREE.Object3D): void;
 }

@@ -151,14 +151,14 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
 
   // apply compiled graph
   createEffect(
-    () => [ed.compiled(), ready(), ed.state.doc.settings.enablePost, ed.state.doc.target] as const,
-    ([result, isReady, enablePost, target]) => {
+    () => [ed.compiled(), ready(), ed.state.doc.settings.enablePost, ed.state.doc.target, JSON.stringify(ed.state.doc.settings.targetPreview ?? {})] as const,
+    ([result, isReady, enablePost, target, targetSettings]) => {
       if (!result || !isReady || !preview) return;
       const fn = projectKind({ target }) === "function";
       // per-node signatures let unchanged previews keep their shaders across recompiles
       const signatures = untrack(() => nodeSignatures(ed.state.doc, ed.state.doc.graphs[fn ? "function" : "material"]));
       const post = !target && result.post.connected && enablePost ? result.runtime.post : null;
-      const errors = fn ? preview.applyTarget(target!, result.runtime.function, signatures) : preview.apply(result.runtime.material, post, signatures);
+      const errors = fn ? preview.applyTarget(target!, result.runtime.function, signatures, JSON.parse(targetSettings)) : preview.apply(result.runtime.material, post, signatures);
       ed.setState((s) => void (s.runtimeErrors = errors));
     },
   );
@@ -376,6 +376,18 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
             <p class="text-sm text-muted-foreground">Configure the preview geometry and instancing.</p>
           </div>
           <div class="grid gap-4">
+            <For each={getTargetPreview(ed.state.doc.target)?.settings ?? []}>
+              {(st) => (
+                <Field label={st.label}>
+                  <Select
+                    class="h-9 px-3"
+                    value={settings().targetPreview?.[st.key] ?? st.default ?? st.options()[0]?.value ?? ""}
+                    options={st.options()}
+                    onChange={(v) => setSetting("targetPreview", { ...settings().targetPreview, [st.key]: v })}
+                  />
+                </Field>
+              )}
+            </For>
             <Field label="Geometry">
               <Select
                 class="h-9 px-3"

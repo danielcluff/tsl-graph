@@ -249,9 +249,10 @@ export class PreviewRenderer {
    * Function-target projects: show the graph on the target's preview object
    * (in place of the mesh); node thumbnails use the target's thumbnail inputs.
    */
-  applyTarget(targetId: string, body: string, signatures?: Map<string, string>): string[] {
+  applyTarget(targetId: string, body: string, signatures?: Map<string, string>, settings: Record<string, string> = {}): string[] {
     const errors: string[] = [];
     if (!this.renderer) return errors;
+    this.lastTargetApply = { targetId, body, signatures, settings };
     const target = getTarget(targetId);
     const preview = getTargetPreview(targetId);
     this.contentVersion++;
@@ -267,7 +268,16 @@ export class PreviewRenderer {
       // thumbnails: the same body with the target's thumbnail bindings
       const thumbs = evaluate(preview.thumbnailInputs());
       this.materialResult = { material: null, nodes: thumbs.nodes, uniforms: thumbs.uniforms };
-      const { object, uniforms } = preview.apply(evaluate, this.targetObject?.object, { scene: this.scene, camera: this.camera, mesh: this.mesh });
+      const resolved = Object.fromEntries((preview.settings ?? []).map((st) => [st.key, settings[st.key] ?? st.default ?? st.options()[0]?.value ?? ""]));
+      const { object, uniforms } = preview.apply(evaluate, this.targetObject?.object, {
+        scene: this.scene,
+        camera: this.camera,
+        mesh: this.mesh,
+        domElement: this.renderer.domElement,
+        renderer: this.renderer,
+        settings: resolved,
+        refresh: () => this.refreshTarget(),
+      });
       if (this.targetObject?.object !== object) {
         if (this.targetObject) this.scene.remove(this.targetObject.object);
         this.scene.add(object);
@@ -279,6 +289,20 @@ export class PreviewRenderer {
       errors.push(err instanceof Error ? err.message : String(err));
     }
     return errors;
+  }
+
+  private lastTargetApply?: { targetId: string; body: string; signatures?: Map<string, string>; settings: Record<string, string> };
+  private refreshQueued = false;
+
+  /** Run the last applyTarget again (a target preview asked for it). */
+  private refreshTarget() {
+    if (this.refreshQueued) return;
+    this.refreshQueued = true;
+    queueMicrotask(() => {
+      this.refreshQueued = false;
+      const last = this.lastTargetApply;
+      if (last && this.targetObject?.id === last.targetId) this.onError(this.applyTarget(last.targetId, last.body, last.signatures, last.settings));
+    });
   }
 
   /** Whether the current target preview animates on its own (render continuously). */
@@ -763,6 +787,7 @@ export class PreviewRenderer {
     this.disposed = true;
     this.resizeObserver.disconnect();
     if (!this.renderer) return;
+    this.removeTargetObject();
     this.renderer.setAnimationLoop(null);
     this.controls.dispose();
     this.pipeline?.dispose();

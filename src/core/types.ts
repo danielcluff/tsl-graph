@@ -271,6 +271,8 @@ export interface PreviewSettings {
   ambientIntensity: number;
   /** Default for node preview thumbnails; a node's own `debug` flag overrides it. */
   nodePreviews: boolean;
+  /** Settings a target's preview declares (e.g. which model to show a shield on), by key. */
+  targetPreview?: Record<string, string>;
 }
 
 export interface ProjectDoc {
