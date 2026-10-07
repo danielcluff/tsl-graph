@@ -78,7 +78,7 @@ export function GraphEditor(props: GraphEditorProps) {
 
 function EditorShell(props: { doc: ProjectDoc; persist: boolean; embed: boolean; notice?: GraphEditorProps["notice"] }) {
   const host = useContext(HostContext);
-  const ed = createEditor(untrack(() => props.doc), { save: untrack(() => props.persist) ? (doc) => host.projects.save(doc) : undefined });
+  const ed = createEditor(untrack(() => props.doc), { save: untrack(() => props.persist) ? (doc) => host.projects.save(doc) : undefined, load: untrack(() => props.persist) ? () => host.projects.load(props.doc.id) : undefined });
   const chat = createChat(ed, host);
   if (import.meta.env?.DEV) (window as unknown as { __tsl: unknown }).__tsl = { ed, ui, chat };
   ui.insertSubgraphById = (id, at) => {
@@ -97,8 +97,12 @@ function EditorShell(props: { doc: ProjectDoc; persist: boolean; embed: boolean;
       }),
     );
     const offBridge = untrack(() => props.persist) ? connectBridge(ed, host) : () => {};
+    const onFocus = () => { void ed.checkForUpdates(); };
+    const onVisibility = () => { if (document.visibilityState === "visible") onFocus(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
     const beforeUnload = (e: BeforeUnloadEvent) => {
-      if (ed.state.saveState === "unsaved" || ed.state.saveState === "saving") {
+      if (ed.state.saveState !== "saved") {
         void ed.save();
         e.preventDefault();
       }
@@ -108,7 +112,7 @@ function EditorShell(props: { doc: ProjectDoc; persist: boolean; embed: boolean;
     // automatic thumbnails: at most every 15s, only after content changes
     let lastThumbVersion = -1;
     const thumbTimer = window.setInterval(async () => {
-      if (!untrack(() => props.persist) || ed.state.doc.settings.thumbnail !== "auto") return;
+      if (!untrack(() => props.persist) || ed.state.externalConflict || document.visibilityState !== "visible" || ed.state.doc.settings.thumbnail !== "auto") return;
       const v = ed.version();
       if (v === lastThumbVersion || !ed.previewHooks.thumbnail) return;
       lastThumbVersion = v;
@@ -124,6 +128,8 @@ function EditorShell(props: { doc: ProjectDoc; persist: boolean; embed: boolean;
     return () => {
       offKeys();
       offBridge();
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
       clearInterval(thumbTimer);
       window.removeEventListener("beforeunload", beforeUnload);
       // disposal runs inside an owned scope: no reactive writes here

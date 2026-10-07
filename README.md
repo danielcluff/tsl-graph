@@ -247,3 +247,18 @@ playground/    example host app (also bench.html, e2e.html: the benchmark and ca
 packages/      solid-graph (submodule): the canvas
 tests/e2e/     canvas tests in headless Chromium
 ```
+
+### Keeping editor tabs in sync
+
+On focus (or when a hidden tab becomes visible), a persistent editor reloads the
+project and compares its `updatedAt` with the last version it loaded or saved.
+A clean tab adopts a changed file, including settings and globals. If the tab
+has local edits, a conflict dialog pauses autosaving and offers **Reload file**,
+**Keep this tab** (overwrite), or **Decide later**. Dismissing the dialog keeps
+saving paused and leaves a Resolve conflict banner.
+
+The same check runs before autosaves and MCP commands, so a background thumbnail
+or a pending debounce cannot silently save an already-stale graph. Failed loads
+block saving until a check succeeds. These are client-side freshness checks;
+simultaneous writes between the read and save still require a host-side revision
+check for atomic conflict protection.

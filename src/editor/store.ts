@@ -43,6 +43,8 @@ import type {
 } from "../core/types";
 import { ui } from "./ui-state";
 
+import { createPersistence, type SaveState } from "./persistence";
+
 export type Mode = "pan" | "select";
 /**
  * Pan mode (left-drag on empty canvas pans, toggled with H/V) is switched off:
@@ -87,7 +89,7 @@ function sameRecord(a: Record<string, string>, b: Record<string, string>): boole
 
 export function createEditor(
   initial: ProjectDoc,
-  opts: { readonly?: boolean; /** Persist the document (debounced); omit for an unsaved, in-memory project. */ save?: (doc: ProjectDoc) => Promise<void> } = {},
+  opts: { readonly?: boolean; /** Persist the document (debounced); omit for an unsaved, in-memory project. */ save?: (doc: ProjectDoc) => Promise<void>; load?: () => Promise<ProjectDoc> } = {},
 ) {
   const persist = !!opts.save;
   const [state, setState] = createStore({
@@ -96,7 +98,8 @@ export function createEditor(
     selection: { nodes: [] as string[], edges: [] as string[] },
     viewports: {} as Record<string, Viewport>,
     mode: (PAN_MODE_ENABLED ? "pan" : "select") as Mode,
-    saveState: "saved" as "saved" | "unsaved" | "saving" | "error",
+    saveState: "saved" as SaveState,
+    externalConflict: false,
     sidebarOpen: true,
     runtimeErrors: [] as string[],
     subgraph: null as SubgraphSession | null,
@@ -212,7 +215,7 @@ export function createEditor(
     setVersion((v) => v + 1);
     if (persist) {
       setState((s) => {
-        s.saveState = "unsaved";
+        s.saveState = s.externalConflict ? "conflict" : "unsaved";
       });
       clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => void save(), 700);
@@ -262,36 +265,28 @@ export function createEditor(
     }
   }
 
-  let saving = false;
-  let saveAgain = false;
+  const persistence = opts.save ? createPersistence(snapshot(state.doc) as ProjectDoc, {
+    current: () => snapshot(state.doc) as ProjectDoc,
+    load: opts.load,
+    save: opts.save,
+    accept: (doc) => {
+      clearTimeout(saveTimer);
+      past = [];
+      future = [];
+      replaceDoc(doc);
+      setState((s) => { s.canUndo = false; s.canRedo = false; });
+    },
+    saved: (doc) => setState((s) => { s.doc.updatedAt = doc.updatedAt; }),
+    status: (value) => setState((s) => { s.saveState = value; }),
+    conflict: (value) => setState((s) => { s.externalConflict = value; }),
+  }) : undefined;
+
   async function save() {
-    if (!persist) return;
     clearTimeout(saveTimer);
-    if (saving) {
-      saveAgain = true;
-      return;
-    }
-    saving = true;
-    setState((s) => {
-      s.saveState = "saving";
-    });
-    try {
-      await opts.save!(snapshot(state.doc) as ProjectDoc);
-      setState((s) => {
-        s.saveState = saveAgain ? "unsaved" : "saved";
-      });
-    } catch {
-      setState((s) => {
-        s.saveState = "error";
-      });
-    } finally {
-      saving = false;
-      if (saveAgain) {
-        saveAgain = false;
-        void save();
-      }
-    }
+    await persistence?.save();
   }
+  const checkForUpdates = () => persistence?.check() ?? Promise.resolve();
+  const resolveConflict = (choice: "reload" | "overwrite") => persistence?.resolve(choice) ?? Promise.resolve();
 
   /** Replace the whole document (load from JSON / external reload). */
   function replaceDoc(doc: ProjectDoc, o: { history?: boolean } = {}) {
@@ -964,6 +959,8 @@ export function createEditor(
     pushHistory,
     mutate,
     save,
+    checkForUpdates,
+    resolveConflict,
     compileNow,
     scheduleCompile,
     replaceDoc,

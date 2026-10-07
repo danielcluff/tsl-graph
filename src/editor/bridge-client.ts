@@ -1,4 +1,4 @@
-import { snapshot, untrack } from "solid-js";
+import { untrack } from "solid-js";
 import type { Command } from "../core/commands";
 import type { GraphHost } from "../host";
 import { serverUrl } from "./host";
@@ -22,9 +22,12 @@ export function connectBridge(ed: Editor, host: GraphHost): () => void {
   };
 
   const handlers: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown> = {
-    command: (params) => {
+    command: async (params) => {
       if (params.projectId && params.projectId !== ed.state.doc.id) throw new Error("Editor has a different project open");
       const command = params.command as Command;
+      await ed.checkForUpdates();
+      if (ed.state.externalConflict && command.op !== "getGraph" && command.op !== "compile")
+        throw new Error("This tab has conflicting local edits. Resolve the save conflict in the editor first.");
       const result = ed.runCommand(command);
       if (command.op !== "getGraph" && command.op !== "compile") ui.toast(`Agent: ${describe(command)}`);
       return result;
@@ -72,11 +75,7 @@ export function connectBridge(ed: Editor, host: GraphHost): () => void {
       } else if (msg.type === "navigate" && msg.projectId) {
         host.openProject(msg.projectId);
       } else if ((msg.type === "reload" || msg.type === "saved") && msg.projectId === ed.state.doc.id) {
-        // changed on disk (agent without editor, or another tab)
-        if (ed.state.saveState === "saved") {
-          const doc = await host.projects.load(ed.state.doc.id);
-          if (JSON.stringify(doc.graphs) !== JSON.stringify(snapshot(ed.state.doc.graphs))) ed.replaceDoc(doc);
-        }
+        await ed.checkForUpdates();
       }
     };
     ws.onclose = () => {

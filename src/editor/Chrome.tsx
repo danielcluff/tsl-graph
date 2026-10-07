@@ -207,7 +207,7 @@ export function TopBar(props: { embed?: boolean; onSaveJson: () => void; onLoadJ
 function SaveBadge() {
   const ed = useContext(EditorContext);
   const label = () =>
-    ({ saved: "Saved", unsaved: "Unsaved", saving: "Saving…", error: "Save failed" })[ed.state.saveState];
+    ({ saved: "Saved", unsaved: "Unsaved", saving: "Saving…", error: "Save failed", conflict: "Conflict · save paused" })[ed.state.saveState];
   return (
     <span
       class={[

@@ -15,6 +15,7 @@ export function Dialogs(props: { persist: boolean }) {
   const host = useContext(HostContext);
   return (
     <>
+      <SaveConflictDialog />
       <CodeViewDialog />
       <CodeNodeDialog />
       <HelpDialog />
@@ -26,6 +27,33 @@ export function Dialogs(props: { persist: boolean }) {
       </Show>
     </>
   );
+}
+
+function SaveConflictDialog() {
+  const ed = useContext(EditorContext);
+  const [busy, setBusy] = createSignal(false);
+  const [dismissed, setDismissed] = createSignal(false);
+  const resolve = async (choice: "reload" | "overwrite") => {
+    setBusy(true);
+    try { await ed.resolveConflict(choice); } finally { setBusy(false); }
+  };
+  return <>
+    <Show when={ed.state.externalConflict && dismissed()}>
+      <div class="absolute bottom-16 left-1/2 z-50 -translate-x-1/2 rounded-md border bg-background p-3 shadow-xl">
+        Saving paused: this file changed elsewhere. <Button size="xs" onClick={() => setDismissed(false)}>Resolve conflict</Button>
+      </div>
+    </Show>
+    <Dialog open={ed.state.externalConflict && !dismissed()} onClose={() => setDismissed(true)} title="This shader changed in another tab or on disk">
+      <p class="text-sm">This tab also has local changes. Autosave is paused so neither version is silently overwritten.</p>
+      <p class="mt-2 text-sm text-muted-foreground">Reloading discards this tab’s changes. Keeping this tab’s version overwrites the file on disk. You can also leave both versions untouched for now.</p>
+      <Show when={ed.state.saveState === "error"}><p class="mt-2 text-sm text-destructive">Could not read or save the file. Your local changes are still here; please retry.</p></Show>
+      <div class="mt-4 flex flex-wrap justify-end gap-2">
+        <Button disabled={busy()} onClick={() => setDismissed(true)}>Decide later</Button>
+        <Button disabled={busy()} onClick={() => void resolve("reload")}>Reload file · discard local changes</Button>
+        <Button disabled={busy()} onClick={() => void resolve("overwrite")}>Keep this tab · overwrite file</Button>
+      </div>
+    </Dialog>
+  </>;
 }
 
 function CopyButton(props: { text: () => string }) {
