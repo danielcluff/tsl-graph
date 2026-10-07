@@ -351,6 +351,32 @@ describe("viewport", () => {
     expect(s1.nodes.mul).toEqual(s0.nodes.mul);
   });
 
+  it("space-drag doesn't press the button that has focus when Space is released", async () => {
+    const expanded = () => page.evaluate(() => (window as any).__tsl.ui.previewExpanded() as boolean);
+    const toggle = page.getByRole("button", { name: "Toggle expanded preview" });
+    // expand and collapse with the mouse: the button keeps focus
+    await toggle.click();
+    await toggle.click();
+    await settle(page);
+    expect(await expanded()).toBe(false);
+    expect(await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))).toBe("Toggle expanded preview");
+    const from = await emptyPoint(page, { x: 900, y: 500 });
+    await page.keyboard.down("Space");
+    await drag(page, from, { x: from.x + 80, y: from.y + 40 });
+    await page.keyboard.up("Space");
+    await settle(page);
+    expect((await snapshot(page)).viewport).toEqual({ x: 800, y: 260, zoom: 1 });
+    expect(await expanded()).toBe(false);
+  });
+
+  it("Space still presses a focused button when nothing is dragged", async () => {
+    const expanded = () => page.evaluate(() => (window as any).__tsl.ui.previewExpanded() as boolean);
+    await page.getByRole("button", { name: "Toggle expanded preview" }).focus();
+    await page.keyboard.press("Space");
+    await settle(page);
+    expect(await expanded()).toBe(true);
+  });
+
   it("pans with a middle-button drag", async () => {
     const g = await grabPoint(page, "mul");
     await drag(page, g, { x: g.x - 40, y: g.y + 30 }, { button: "middle" });
