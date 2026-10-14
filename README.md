@@ -81,6 +81,12 @@ const editor = mountGraphEditor(container, { host, projectId: "abc", theme: "dar
 // switching projects: editor.dispose(); mountGraphEditor(container, { host, projectId: next });
 ```
 
+`previewPost` (optional) lets the host post-process the main preview, e.g. to share one look with its other
+viewports: `create(renderer, scene, camera)` returns a stack (`enabled`, `render()`, `onChange(fn)`, `dispose()`)
+and `controls()` renders its settings in a popover from the preview toolbar. A project's own post graph wins when
+it is enabled and has effects in it (not just input → output); target projects, which have no post graph, always
+use the host's. elate-particles-editor's `PreviewPost` fits the contract as is.
+
 In a Solid app use `<GraphEditor host={host} projectId={id} />` directly (key it on the id). Pass `doc` instead of
 `projectId` for an in-memory project that is never saved. The editor fills its nearest positioned ancestor.
 

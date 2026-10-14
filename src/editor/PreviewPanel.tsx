@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createMemo, createSignal, onSettled, snapshot, untrack, useContext } from "solid-js";
-import { Camera, CircleAlert, Crosshair, Maximize2, Minimize2, SlidersHorizontal } from "lucide-static";
+import { Aperture, Camera, CircleAlert, Crosshair, Maximize2, Minimize2, SlidersHorizontal } from "lucide-static";
 import type { GeometryKind, GraphKind, PreviewSettings } from "../core/types";
 import { animatedNodes, hasPreview, nodePreviewOn, nodeSignatures, primaryGraph, projectKind, resolveSettings } from "../core/graph";
 import { getNodeDef } from "../core/registry";
@@ -8,6 +8,7 @@ import { getTargetPreview } from "../runtime/targets";
 import { LIVE_PREVIEW_ZOOM } from "../runtime/preview-size";
 import { Button, Dialog, Icon, NumberField, Popover, Select, Slider, Switch, Tooltip, togglePopover, type PopoverAnchor } from "../ui";
 import { CodeEditor } from "./CodeEditor";
+import { HostContext } from "./host";
 import { EditorContext } from "./store";
 import { ui } from "./ui-state";
 
@@ -81,9 +82,11 @@ function readFpsPreference(): number {
 
 export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) {
   const ed = useContext(EditorContext);
+  const graphHost = useContext(HostContext);
   let host!: HTMLDivElement;
   let preview: PreviewRenderer | undefined;
   const [settingsAnchor, setSettingsAnchor] = createSignal<PopoverAnchor | null>(null);
+  const [postAnchor, setPostAnchor] = createSignal<PopoverAnchor | null>(null);
   const [scriptOpen, setScriptOpen] = createSignal(false);
   const [ready, setReady] = createSignal(false);
   const [backend, setBackend] = createSignal("");
@@ -101,6 +104,8 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
       .then(() => {
         setReady(true);
         setBackend(preview!.backend);
+        const hostPost = graphHost?.previewPost;
+        if (hostPost) void preview!.setHostPost((r, s, c) => hostPost.create(r, s, c));
         props.onReady?.(preview!);
       })
       .catch((err) => setInitError(err instanceof Error ? err.message : String(err)));
@@ -157,7 +162,8 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
       const fn = projectKind({ target }) === "function";
       // per-node signatures let unchanged previews keep their shaders across recompiles
       const signatures = untrack(() => nodeSignatures(ed.state.doc, ed.state.doc.graphs[fn ? "function" : "material"]));
-      const post = !target && result.post.connected && enablePost ? result.runtime.post : null;
+      // a post graph with no effects (input → output) leaves the host's post-processing in charge
+      const post = !target && result.post.connected && enablePost && postHasEffects() ? result.runtime.post : null;
       const errors = fn ? preview.applyTarget(target!, result.runtime.function, signatures, JSON.parse(targetSettings)) : preview.apply(result.runtime.material, post, signatures);
       ed.setState((s) => void (s.runtimeErrors = errors));
     },
@@ -189,6 +195,10 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
   // material depends on time (or similar), or post-processing runs effects (some, like
   // afterimage or TRAA, depend on previous frames, so any effect counts). Otherwise it
   // redraws on edits and camera movement only.
+  // whether the project's post graph does anything beyond passing the scene through
+  function postHasEffects() {
+    return ed.state.doc.graphs.post.nodes.some((n) => !["postInput", "postOutput", "comment", "group"].includes(getNodeDef(n.type)?.kind ?? ""));
+  }
   const mainAnimated = createMemo(() => {
     const doc = ed.state.doc;
     // some target previews always move (e.g. particles age)
@@ -196,7 +206,7 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
     const mat = doc.graphs.material.nodes.find((n) => getNodeDef(n.type)?.kind === "material");
     if (mat && animatedNodes(doc, doc.graphs.material).has(mat.id)) return true;
     if (!doc.settings.enablePost) return false;
-    return doc.graphs.post.nodes.some((n) => !["postInput", "postOutput", "comment", "group"].includes(getNodeDef(n.type)?.kind ?? ""));
+    return postHasEffects();
   });
   createEffect(mainAnimated, (animated) => preview?.setMainAnimated(animated));
 
@@ -307,6 +317,18 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
             <Icon svg={Camera} class="size-3.5" />
           </button>
         </Tooltip>
+        <Show when={graphHost?.previewPost?.controls}>
+          <Tooltip content="Post-processing" side="bottom">
+            <button
+              type="button"
+              aria-label="Post-processing"
+              class="flex size-7 items-center justify-center rounded-md text-white/80 hover:bg-white/10 hover:text-white"
+              onClick={(e) => togglePopover(postAnchor(), setPostAnchor, e)}
+            >
+              <Icon svg={Aperture} class="size-3.5" />
+            </button>
+          </Tooltip>
+        </Show>
         <Tooltip content="Preview settings" side="bottom">
           <button
             type="button"
@@ -362,6 +384,16 @@ export function PreviewPanel(props: { onReady?: (p: PreviewRenderer) => void }) 
         </div>
       </Show>
 
+      <Show when={graphHost?.previewPost?.controls}>
+        {(controls) => (
+          <Popover open={!!postAnchor()} anchor={postAnchor()?.rect} trigger={postAnchor()?.el} align="end" onClose={() => setPostAnchor(null)} class="w-64 p-0">
+            <Show when={!ed.state.doc.target && ed.state.doc.settings.enablePost && postHasEffects()}>
+              <p class="border-b px-3 py-2 text-[11px] text-muted-foreground">This project's post graph is in use; these apply when it's off.</p>
+            </Show>
+            {controls()()}
+          </Popover>
+        )}
+      </Show>
       <Popover
         open={!!settingsAnchor()}
         anchor={settingsAnchor()?.rect}

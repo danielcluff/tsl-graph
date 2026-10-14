@@ -8,6 +8,8 @@
 //  - GraphHost   (browser) is passed to the editor when it is mounted.
 //  - ProjectStore + GraphServerOptions (Node) are passed to createGraphServer.
 
+import type { JSX } from "@solidjs/web";
+import type { Camera, Scene, WebGPURenderer } from "three/webgpu";
 import type { ProjectDoc, ProjectSummary } from "./core/types";
 
 export type { ProjectDoc, ProjectSummary } from "./core/types";
@@ -19,6 +21,17 @@ export const PROVIDER_IDS: ProviderId[] = ["anthropic", "openai", "google"];
 // ---------------------------------------------------------------------------
 // browser
 // ---------------------------------------------------------------------------
+
+/** A host's post-processing stack, built for one preview renderer. */
+export interface HostPostStack {
+  /** Whether it should replace the preview's direct render right now. */
+  readonly enabled: boolean;
+  /** Render the scene through the stack to the canvas. */
+  render(): void;
+  /** Called when its settings change, so an on-demand preview redraws. */
+  onChange(fn: () => void): () => void;
+  dispose(): void;
+}
 
 /** Project persistence as seen from the editor. */
 export interface ProjectSource {
@@ -63,6 +76,16 @@ export interface GraphHost {
    */
   ai?: {
     getApiKey?(provider: ProviderId): string | undefined | null | Promise<string | undefined | null>;
+  };
+  /**
+   * Post-processing the host applies to the main preview (e.g. one look shared
+   * with its other viewports). A project's own post graph takes precedence
+   * when it is enabled and has effects in it; otherwise this stack is used.
+   */
+  previewPost?: {
+    create(renderer: WebGPURenderer, scene: Scene, camera: Camera): HostPostStack;
+    /** Controls shown from the preview's toolbar. Omit to show none. */
+    controls?: () => JSX.Element;
   };
 }
 

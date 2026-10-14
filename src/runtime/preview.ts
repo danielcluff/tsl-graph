@@ -4,6 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { PreviewSettings } from "../core/types";
+import type { HostPostStack } from "../host";
 import { PREVIEW_SIZE, paceFrame } from "./preview-size";
 import "./particle";
 import { getTarget } from "../core/targets";
@@ -80,6 +81,8 @@ export class PreviewRenderer {
   light = new THREE.DirectionalLight(0xffffff, 2);
   lightHelper?: THREE.DirectionalLightHelper;
   pipeline?: THREE.RenderPipeline;
+  /** The host's post stack (GraphHost.previewPost), used when the project's own post isn't. */
+  private hostPost?: { stack: HostPostStack; off: () => void };
   settings!: PreviewSettings;
   materialResult?: MaterialResult;
   postResult?: PostResult;
@@ -216,12 +219,32 @@ export class PreviewRenderer {
     if (moved || this.mainDirty || this.mainAnimated) {
       this.mainDirty = false;
       try {
-        if (this.pipeline && this.settings.enablePost) this.pipeline.render();
-        else this.renderer.render(this.scene, this.camera);
+        this.renderScene();
       } catch (err) {
         this.onError([`Render: ${err instanceof Error ? err.message : String(err)}`]);
       }
     }
+  }
+
+  /** The project's post graph when it runs, else the host's stack when on, else a direct render. */
+  private renderScene(withPost = true) {
+    if (withPost && this.pipeline && this.settings.enablePost) this.pipeline.render();
+    else if (withPost && this.hostPost?.stack.enabled) this.hostPost.stack.render();
+    else this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Use a host's post-processing (GraphHost.previewPost) where the project has none; null removes it. */
+  async setHostPost(create: ((renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.Camera) => HostPostStack) | null) {
+    await this.ready;
+    if (this.disposed) return;
+    this.hostPost?.off();
+    this.hostPost?.stack.dispose();
+    this.hostPost = undefined;
+    if (create) {
+      const stack = create(this.renderer, this.scene, this.camera);
+      this.hostPost = { stack, off: stack.onChange(() => this.invalidate()) };
+    }
+    this.invalidate();
   }
 
   /** Node previews run on their own clock (PREVIEW_FPS), independent of the main cap. */
@@ -580,16 +603,14 @@ export class PreviewRenderer {
       r.setSize(width, height, false);
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
-      if (this.pipeline && withPost && this.settings.enablePost) this.pipeline.render();
-      else r.render(this.scene, this.camera);
+      this.renderScene(withPost);
       const url = canvas.toDataURL("image/png");
       r.setPixelRatio(prevRatio);
       r.setSize(prevSize.x, prevSize.y, false);
       this.resize();
       return url;
     }
-    if (this.pipeline && withPost && this.settings.enablePost) this.pipeline.render();
-    else r.render(this.scene, this.camera);
+    this.renderScene(withPost);
     return canvas.toDataURL("image/png");
   }
 
@@ -791,6 +812,8 @@ export class PreviewRenderer {
     this.renderer.setAnimationLoop(null);
     this.controls.dispose();
     this.pipeline?.dispose();
+    this.hostPost?.off();
+    this.hostPost?.stack.dispose();
     for (const rt of this.debugRTs.values()) rt.dispose();
     for (const e of this.debugMats.values()) e.mat.dispose();
     this.renderer.dispose();
