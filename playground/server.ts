@@ -10,7 +10,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { ProjectDoc } from "../src/core/types";
 import { createFileStore, createGraphServer, envApiKey } from "../src/server";
 
-const PORT = Number(process.env.PORT ?? 5173);
+const PORT = Number(process.env.PORT ?? 5130);
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PROD = process.env.NODE_ENV === "production";
 const ROOT = resolve(import.meta.dirname, "..");

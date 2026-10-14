@@ -172,14 +172,14 @@ The canvas is [solid-graph](https://github.com/danielcluff/solid-graph), a git s
 
 ```bash
 pnpm install
-pnpm dev            # http://localhost:5173, the app's MCP at http://localhost:5173/mcp (graph tools as shader_*)
+pnpm dev            # http://localhost:5130, the app's MCP at http://localhost:5130/mcp (graph tools as shader_*)
 pnpm test
 pnpm test:e2e       # canvas behaviour in headless Chromium (npx playwright-core install chromium once)
 pnpm typecheck
 ```
 
 `pnpm bench` measures the canvas (pan, zoom, drags, box select, wires, selection, add/remove) on generated projects of
-70, 200 and 500 nodes against a running playground (`--url`, default http://localhost:5173), saving the results to
+70, 200 and 500 nodes against a running playground (`--url`, default http://localhost:5130), saving the results to
 `bench/results/`; `--cpu 4` throttles the CPU, `pnpm bench --compare a.json b.json` compares two runs. The page it
 drives is `playground/bench.html?n=200`; `npx tsx scripts/bench-profile.ts --scenarios dragAll` (or `--mount`) lists
 the functions with the most self time.

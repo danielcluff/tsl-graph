@@ -12,7 +12,7 @@ import { chromium } from "playwright-core";
 
 const { values } = parseArgs({
   options: {
-    url: { type: "string", default: process.env.BENCH_URL ?? "http://localhost:5173" },
+    url: { type: "string", default: process.env.BENCH_URL ?? "http://localhost:5130" },
     n: { type: "string", multiple: true },
     steps: { type: "string", default: "60" },
     reps: { type: "string", default: "3" },

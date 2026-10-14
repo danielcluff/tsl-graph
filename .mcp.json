@@ -2,7 +2,7 @@
   "mcpServers": {
     "tsl-graph": {
       "type": "http",
-      "url": "http://localhost:5173/mcp"
+      "url": "http://localhost:5130/mcp"
     }
   }
 }

@@ -6,7 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { writeFileSync } from "node:fs";
 
 const client = new Client({ name: "smoke", version: "1" });
-await client.connect(new StreamableHTTPClientTransport(new URL(process.env.URL ?? "http://localhost:5173/mcp")));
+await client.connect(new StreamableHTTPClientTransport(new URL(process.env.URL ?? "http://localhost:5130/mcp")));
 const text = (r: any) => r.content.map((c: any) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
 const call = async (name: string, args: Record<string, unknown> = {}) => {
   const r: any = await client.callTool({ name: `${process.env.PREFIX ?? "shader_"}${name}`, arguments: args });

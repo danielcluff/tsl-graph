@@ -1,12 +1,12 @@
 // CPU profile of benchmark scenarios: the functions with the most self time.
-//   pnpm tsx scripts/bench-profile.ts --url http://localhost:5173 --n 500 --scenarios connect
-//   pnpm tsx scripts/bench-profile.ts --url http://localhost:5173 --n 500 --mount
+//   pnpm tsx scripts/bench-profile.ts --url http://localhost:5130 --n 500 --scenarios connect
+//   pnpm tsx scripts/bench-profile.ts --url http://localhost:5130 --n 500 --mount
 import { parseArgs } from "node:util";
 import { chromium } from "playwright-core";
 
 const { values } = parseArgs({
   options: {
-    url: { type: "string", default: "http://localhost:5173" },
+    url: { type: "string", default: "http://localhost:5130" },
     n: { type: "string", default: "500" },
     scenarios: { type: "string", default: "connect" },
     top: { type: "string", default: "25" },

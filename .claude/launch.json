@@ -5,7 +5,7 @@
       "name": "playground",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
-      "port": 5174,
+      "port": 5130,
       "autoPort": true
     }
   ]

@@ -3,7 +3,7 @@
 //   PORT=5199 npx tsx scripts/mock-ai.ts
 //   ANTHROPIC_BASE_URL=http://127.0.0.1:5199 ANTHROPIC_API_KEY=test \
 //   OPENAI_BASE_URL=http://127.0.0.1:5199/v1 OPENAI_API_KEY=test \
-//   GEMINI_BASE_URL=http://127.0.0.1:5199 GEMINI_API_KEY=test PORT=5174 pnpm dev
+//   GEMINI_BASE_URL=http://127.0.0.1:5199 GEMINI_API_KEY=test PORT=5130 pnpm dev
 // Each run: read the graph, add a fresnel glow, validate, reply.
 import { createServer, type ServerResponse } from "node:http";
 import { writeFileSync } from "node:fs";
